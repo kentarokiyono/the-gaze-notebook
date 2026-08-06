@@ -1076,7 +1076,7 @@
       if(o.provider==='ollama')return callOllama(o.endpoint,full,o.model);
       throw new Error('不明なプロバイダー');}
     async function callGemini(apiKey,prompt){if(!apiKey)throw new Error('Gemini APIキー未設定');
-      const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key='+apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:4096}})});
+      const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key='+apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:4096}})});
       if(!r.ok){const et=await r.text();let em='Gemini API Error';try{em=JSON.parse(et).error&&JSON.parse(et).error.message||em;}catch(e){}throw new Error(em);}
       const d=await r.json();const t=d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts&&d.candidates[0].content.parts[0]&&d.candidates[0].content.parts[0].text;if(!t)throw new Error('応答なし');return t;}
     async function callClaude(apiKey,prompt){if(!apiKey)throw new Error('Claude APIキー未設定');
