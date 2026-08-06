@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Gaze - AI Native Second Brain</title>
+  <meta name="theme-color" content="#0a0a0b">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://unpkg.com/3d-force-graph/dist/3d-force-graph.min.js"></script>
+
+  <script>
+    tailwind.config={darkMode:'class',theme:{extend:{colors:{
+      'gaze-bg':'#0a0a0b','gaze-surface':'#141416','gaze-surface-light':'#1c1c1f',
+      'gaze-border':'#2a2a2e','gaze-accent':'#007aff','gaze-accent-hover':'#0056b3'}}}}
+  </script>
+
+  <style>
+    html{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue','Inter','Hiragino Sans','Hiragino Kaku Gothic ProN','Arial',sans-serif!important;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;font-feature-settings:'kern' 1,'liga' 1,'calt' 1;}
+    html,body,*{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','SF Pro Text','Helvetica Neue','Inter','Hiragino Sans','Hiragino Kaku Gothic ProN','Arial',sans-serif!important;}
+    code,pre,kbd,samp{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace!important;}
+    *{scrollbar-width:thin;scrollbar-color:#3a3a3e #141416;}
+    ::-webkit-scrollbar{width:8px;height:8px;}::-webkit-scrollbar-track{background:#141416;}
+    ::-webkit-scrollbar-thumb{background:#3a3a3e;border-radius:4px;}::-webkit-scrollbar-thumb:hover{background:#4a4a4e;}
+    .textarea-editor{resize:none;line-height:1.7;font-size:15px;letter-spacing:-0.01em;tab-size:2;}
+    .wikilink-suggestion{cursor:pointer;padding:.5rem .75rem;border-bottom:1px solid #2a2a2e;transition:background .1s;}
+    .wikilink-suggestion:last-child{border-bottom:none;}
+    .wikilink-suggestion:hover{background:#1c1c1f;}
+    .prose,.prose *{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue','Inter','Hiragino Sans',sans-serif!important;}
+    .prose code,.prose pre,.prose pre code{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace!important;}
+    .prose h1,.prose h2,.prose h3{font-weight:700;margin:1em 0 .5em;line-height:1.3;letter-spacing:-0.02em;}
+    .prose h1{font-size:1.6em;border-bottom:1px solid #2a2a2e;padding-bottom:.3em;font-weight:800;}
+    .prose h2{font-size:1.4em;}.prose h3{font-size:1.2em;}
+    .prose p{margin:.6em 0;line-height:1.7;}
+    .prose ul,.prose ol{margin:.6em 0 .6em 1.5em;}.prose ul{list-style:disc;}.prose ol{list-style:decimal;}
+    .prose code{background:rgba(0,122,255,.15);color:#64b5f6;padding:.15em .4em;border-radius:4px;font-size:.88em;}
+    .prose pre{background:rgba(0,0,0,.5);padding:1em;border-radius:10px;overflow-x:auto;margin:.8em 0;border:1px solid #2a2a2e;}
+    .prose pre code{background:none;color:#e2e8f0;font-size:.9em;}
+    .prose blockquote{border-left:3px solid #007aff;padding-left:1em;color:#94a3b8;margin:.8em 0;font-style:italic;}
+    .prose a{color:#64b5f6;}.prose a.wikilink{text-decoration:underline;text-underline-offset:2px;cursor:pointer;}
+    .prose hr{border:none;border-top:1px solid #2a2a2e;margin:1.5em 0;}
+    .fade-in{animation:fadeIn .2s ease-in;}@keyframes fadeIn{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+    .thinking-dots{display:inline-flex;gap:4px;}
+    .thinking-dots span{width:6px;height:6px;background:#64b5f6;border-radius:50%;animation:bounce 1.4s infinite ease-in-out;}
+    .thinking-dots span:nth-child(1){animation-delay:0s;}.thinking-dots span:nth-child(2){animation-delay:.2s;}.thinking-dots span:nth-child(3){animation-delay:.4s;}
+    @keyframes bounce{0%,80%,100%{transform:scale(0);}40%{transform:scale(1);}}
+    .btn-primary{background:#007aff;transition:all .15s;font-weight:500;letter-spacing:-0.01em;}
+    .btn-primary:hover{background:#0056b3;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,122,255,.3);}
+    .btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+    .btn-ghost{transition:all .15s;}.btn-ghost:hover{background:rgba(255,255,255,.05);}
+    .modal-backdrop{backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);background:rgba(0,0,0,.6);}
+    .tab-button{position:relative;transition:all .2s;}.tab-button.active{color:#007aff;}
+    .tab-button.active::after{content:'';position:absolute;bottom:-8px;left:0;right:0;height:2px;background:#007aff;border-radius:2px;}
+    .notion-page-item{cursor:pointer;padding:.75rem;border-radius:.5rem;border:1px solid #2a2a2e;transition:all .15s;}
+    .notion-page-item:hover{background:rgba(255,255,255,.05);border-color:#007aff;}
+    .activity-btn{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;color:#7c8290;transition:all .12s;flex-shrink:0;}
+    .activity-btn:hover{background:rgba(255,255,255,.06);color:#e2e8f0;}
+    .activity-btn.active{background:rgba(0,122,255,.16);color:#60a5fa;}
+    .view{height:100%;}
+    .tree-node{display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:7px;cursor:pointer;transition:background .1s;color:#cbd5e1;}
+    .tree-node:hover{background:rgba(255,255,255,.04);}
+    .tree-node.active{background:rgba(0,122,255,.14);color:#fff;}
+    .tree-caret{width:16px;height:16px;display:flex;align-items:center;justify-content:center;color:#64748b;flex-shrink:0;}
+    .tree-caret:hover{color:#e2e8f0;}
+    .tree-icon{flex-shrink:0;color:#7c8290;}
+    .tree-title{flex:1;min-width:0;font-size:13px;}
+    .tree-add-child{opacity:0;width:18px;height:18px;display:flex;align-items:center;justify-content:center;color:#64748b;border-radius:4px;flex-shrink:0;}
+    .tree-node:hover .tree-add-child{opacity:1;}
+    .tree-add-child:hover{color:#e2e8f0;background:rgba(255,255,255,.08);}
+    .crumb{font-size:12px;transition:color .1s;white-space:nowrap;}
+    .subpage-card{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #2a2a2e;border-radius:8px;transition:all .12s;background:rgba(255,255,255,.02);min-width:0;}
+    .subpage-card:hover{border-color:#475569;background:rgba(255,255,255,.05);}
+    .recent-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;transition:background .12s;width:100%;}
+    .recent-item:hover{background:rgba(255,255,255,.04);}
+    .stat-card{background:rgba(255,255,255,.03);border:1px solid #2a2a2e;border-radius:12px;padding:14px;}
+    .palette-item{display:flex;align-items:center;gap:10px;padding:8px 14px;cursor:pointer;transition:background .1s;font-size:13px;color:#cbd5e1;}
+    .palette-item:hover,.palette-item.selected{background:rgba(0,122,255,.12);color:#fff;}
+    .move-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .1s;font-size:13px;color:#cbd5e1;width:100%;text-align:left;}
+    .move-item:hover{background:rgba(255,255,255,.05);}
+    .tb-btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:#94a3b8;transition:all .12s;flex-shrink:0;}
+    .tb-btn:hover{background:rgba(255,255,255,.06);color:#e2e8f0;}
+    .tb-btn:disabled{opacity:.4;}
+    .tb-sep{width:1px;height:16px;background:#2a2a2e;margin:0 4px;flex-shrink:0;}
+    .mode-btn{width:30px;height:26px;display:flex;align-items:center;justify-content:center;color:#94a3b8;transition:all .12s;}
+    .mode-btn:hover{color:#e2e8f0;}.mode-btn.active{background:rgba(0,122,255,.18);color:#60a5fa;}
+    .icon-btn{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#94a3b8;transition:all .12s;flex-shrink:0;}
+    .icon-btn:hover{background:rgba(255,255,255,.06);color:#e2e8f0;}
+    .icon-btn.active{color:#60a5fa;background:rgba(0,122,255,.12);}
+    .text-btn{display:flex;align-items:center;gap:5px;font-size:11px;color:#94a3b8;padding:5px 9px;border-radius:7px;border:1px solid #2a2a2e;transition:all .12s;flex-shrink:0;}
+    .text-btn:hover{color:#e2e8f0;border-color:#475569;background:rgba(255,255,255,.03);}
+    .tag-chip{font-size:10px;padding:2px 9px;border-radius:999px;border:1px solid #2a2a2e;color:#94a3b8;transition:all .12s;}
+    .tag-chip:hover{border-color:#475569;color:#e2e8f0;}
+    .tag-chip.active{background:rgba(0,122,255,.18);border-color:rgba(0,122,255,.5);color:#60a5fa;}
+    .backlink-item{display:flex;align-items:center;gap:7px;text-align:left;font-size:12px;color:#94a3b8;padding:5px 8px;border-radius:6px;transition:all .12s;width:100%;}
+    .backlink-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0;}
+    .outline-item{display:flex;gap:6px;width:100%;text-align:left;font-size:12px;color:#94a3b8;padding:5px 10px;border-radius:6px;transition:all .12s;}
+    .outline-item:hover{background:rgba(255,255,255,.05);color:#e2e8f0;}
+    .tpl-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:#cbd5e1;padding:5px 10px;border-radius:8px;border:1px solid #2a2a2e;background:rgba(255,255,255,.03);transition:all .12s;cursor:pointer;}
+    .tpl-chip:hover{border-color:rgba(0,122,255,.5);background:rgba(0,122,255,.08);}
+    .tpl-edit{opacity:0;transition:opacity .12s;color:#64748b;display:flex;}
+    .tpl-chip:hover .tpl-edit{opacity:1;}.tpl-edit:hover{color:#e2e8f0;}
+    .related-chip{display:flex;align-items:center;gap:6px;font-size:11px;color:#cbd5e1;padding:4px 10px;border-radius:999px;border:1px solid #2a2a2e;background:rgba(255,255,255,.02);transition:all .12s;}
+    .related-chip:hover{border-color:#475569;background:rgba(255,255,255,.05);}
+    .related-score{font-size:9px;color:#64748b;font-weight:600;}
+    .ai-link-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px dashed rgba(96,165,250,.35);border-radius:8px;background:rgba(0,122,255,.04);}
+    .ai-link-title{font-size:12px;color:#93c5fd;border-bottom:1px dashed rgba(96,165,250,.5);}
+    .chat-message{animation:slideIn .3s ease;}@keyframes slideIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+    .theme-btn{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid transparent;color:#94a3b8;transition:all .15s;}
+    .theme-btn:hover{background:rgba(255,255,255,.06);}
+    .theme-btn.active{background:rgba(0,122,255,.15);border-color:rgba(0,122,255,.5);color:#60a5fa;}
+    #growth-progress-fill{transition:width .7s cubic-bezier(.22,1,.36,1);}
+    @keyframes twinkle{0%,100%{opacity:.25;}50%{opacity:1;}}
+    @keyframes sway{0%,100%{transform:rotate(-1.6deg);}50%{transform:rotate(1.6deg);}}
+    @keyframes flicker{0%,100%{transform:scaleY(1) scaleX(1);opacity:1;}25%{transform:scaleY(1.07) scaleX(.96);opacity:.92;}50%{transform:scaleY(.95) scaleX(1.04);opacity:1;}75%{transform:scaleY(1.05) scaleX(.97);opacity:.88;}}
+    @keyframes glowpulse{0%,100%{opacity:.45;}50%{opacity:.85;}}
+    @keyframes sparkRise{0%{transform:translateY(0);opacity:0;}20%{opacity:1;}100%{transform:translateY(-30px);opacity:0;}}
+    @keyframes levelUpFlash{0%{box-shadow:0 0 0 rgba(96,165,250,0);}40%{box-shadow:0 0 26px rgba(96,165,250,.45);}100%{box-shadow:0 0 0 rgba(96,165,250,0);}}
+    .twinkle{animation:twinkle 3s ease-in-out infinite;}
+    .plant-sway{transform-origin:50px 74px;transform-box:view-box;animation:sway 5s ease-in-out infinite;}
+    .flame-flicker{transform-origin:50px 72px;transform-box:view-box;animation:flicker 1.5s ease-in-out infinite;}
+    .fire-glow{animation:glowpulse 2.4s ease-in-out infinite;}
+    .spark{animation:sparkRise 2s ease-out infinite;}
+    .level-up-flash{animation:levelUpFlash 1.2s ease;}
+  </style>
+</head>
+<body class="bg-gaze-bg text-slate-200 overflow-hidden">
+  <div class="flex h-screen w-screen">
+
+    <!-- ACTIVITY BAR -->
+    <nav class="w-[52px] bg-gaze-surface border-r border-gaze-border flex flex-col items-center py-3 gap-1 flex-shrink-0">
+      <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-2 shadow-lg shadow-blue-500/20"><i data-lucide="eye" class="w-5 h-5 text-white"></i></div>
+      <button data-view="library" class="activity-btn active" title="ライブラリ"><i data-lucide="book-open" class="w-4 h-4"></i></button>
+      <button data-view="graph" class="activity-btn" title="3Dグラフ"><i data-lucide="box" class="w-4 h-4"></i></button>
+      <div class="flex-1"></div>
+      <button id="open-command-btn" class="activity-btn" title="コマンドパレット (⌘K)"><i data-lucide="command" class="w-4 h-4"></i></button>
+      <button id="open-settings-btn" class="activity-btn" title="設定"><i data-lucide="settings" class="w-4 h-4"></i></button>
+    </nav>
+
+    <!-- MAIN -->
+    <main class="flex-1 relative min-w-0">
+
+      <!-- LIBRARY VIEW -->
+      <section id="view-library" class="view flex">
+        <div class="w-[280px] border-r border-gaze-border flex flex-col bg-gaze-surface/40 flex-shrink-0">
+          <div class="p-3 border-b border-gaze-border space-y-2">
+            <button id="lib-new-note" class="btn-primary w-full flex items-center justify-center gap-2 text-white py-2 rounded-lg text-sm"><i data-lucide="plus" class="w-4 h-4"></i>新規ノート</button>
+            <div class="relative">
+              <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500"></i>
+              <input id="lib-search" type="text" placeholder="ページを検索..." class="w-full bg-gaze-bg border border-gaze-border rounded-lg pl-8 pr-3 py-2 text-xs outline-none focus:border-gaze-accent transition-colors">
+            </div>
+          </div>
+          <div class="flex-1 overflow-y-auto p-2" id="page-tree"></div>
+        </div>
+        <div class="flex-1 overflow-y-auto">
+          <div class="max-w-3xl mx-auto p-8">
+            <h2 class="text-2xl font-bold text-white mb-1" style="letter-spacing:-0.02em;">ライブラリ</h2>
+            <p class="text-sm text-slate-500 mb-6">あなたの思考の庭</p>
+            <div class="grid grid-cols-4 gap-3 mb-6">
+              <div class="stat-card"><p class="text-[11px] text-slate-500">ノート</p><p class="text-xl font-bold text-white mt-1" id="stat-notes">0</p></div>
+              <div class="stat-card"><p class="text-[11px] text-slate-500">総文字数</p><p class="text-xl font-bold text-white mt-1" id="stat-total-chars">0</p></div>
+              <div class="stat-card"><p class="text-[11px] text-slate-500">リンク</p><p class="text-xl font-bold text-white mt-1" id="stat-total-links">0</p></div>
+              <div class="stat-card"><p class="text-[11px] text-slate-500">平均充実度</p><p class="text-xl font-bold text-white mt-1" id="stat-avg-rich">—</p></div>
+            </div>
+            <div id="growth-widget" class="bg-white/[0.03] border border-gaze-border rounded-xl p-4 mb-6">
+              <div class="flex items-center justify-between">
+                <div class="flex gap-1" id="theme-selector">
+                  <button data-theme="constellation" class="theme-btn" title="星座"><i data-lucide="star" class="w-4 h-4"></i></button>
+                  <button data-theme="plant" class="theme-btn" title="植物"><i data-lucide="sprout" class="w-4 h-4"></i></button>
+                  <button data-theme="campfire" class="theme-btn" title="焚き火"><i data-lucide="flame" class="w-4 h-4"></i></button>
+                </div>
+                <span id="growth-level-chip" class="text-[10px] px-1.5 py-0.5 rounded-md font-semibold bg-blue-500/15 text-blue-300">Lv.0</span>
+              </div>
+              <div class="flex items-center gap-5 mt-3">
+                <div id="growth-visual" class="flex justify-center items-center flex-shrink-0"></div>
+                <div class="flex-1 min-w-0">
+                  <div id="growth-stage" class="text-sm font-semibold text-slate-200">—</div>
+                  <div id="growth-comment" class="text-xs text-slate-500 mt-0.5 truncate"></div>
+                  <div class="mt-2 h-1 bg-white/5 rounded-full overflow-hidden"><div id="growth-progress-fill" class="h-full rounded-full" style="width:0%;background:linear-gradient(90deg,#3b82f6,#60a5fa);"></div></div>
+                  <div class="flex justify-between mt-2 text-[10px] text-slate-500"><span id="metric-links">リンク 0</span><span id="metric-chars">0字</span><span id="metric-richness">充実度 —</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="flex gap-2 mb-6">
+              <button id="dash-open-graph" class="btn-primary flex items-center gap-2 text-white px-4 py-2 rounded-lg text-sm"><i data-lucide="box" class="w-4 h-4"></i>3Dグラフを開く</button>
+              <button id="dash-new-note" class="btn-ghost flex items-center gap-2 text-slate-300 px-4 py-2 rounded-lg text-sm border border-gaze-border"><i data-lucide="plus" class="w-4 h-4"></i>新規ノート</button>
+            </div>
+            <div class="mb-6">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3" style="letter-spacing:.05em;">Tags</p>
+              <div id="dash-tags" class="flex flex-wrap gap-1.5"></div>
+            </div>
+            <div>
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3" style="letter-spacing:.05em;">最近のノート</p>
+              <div id="recent-list" class="space-y-0.5"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- EDITOR VIEW -->
+      <section id="view-editor" class="view hidden flex">
+        <div class="flex-1 flex flex-col min-w-0">
+          <div class="px-6 py-2 border-b border-gaze-border flex items-center gap-2 text-xs bg-gaze-surface/30">
+            <button id="back-to-library" class="icon-btn !w-6 !h-6" title="ライブラリへ戻る"><i data-lucide="arrow-left" class="w-3.5 h-3.5"></i></button>
+            <div id="breadcrumb" class="flex items-center gap-1 flex-1 min-w-0 overflow-hidden"></div>
+            <button id="move-note-btn" class="text-btn" title="親ページを変更"><i data-lucide="arrow-right-left" class="w-3 h-3"></i>移動</button>
+            <button id="toggle-ai-btn" class="text-btn" title="AIパネル (⌘J)"><i data-lucide="sparkles" class="w-3 h-3"></i>AI</button>
+          </div>
+          <div class="px-8 pt-5 pb-3 border-b border-gaze-border flex items-center gap-2">
+            <input id="note-title" type="text" placeholder="Untitled" class="flex-1 bg-transparent border-none outline-none placeholder-slate-600 text-white min-w-0" style="font-size:1.8rem;font-weight:700;letter-spacing:-0.03em;">
+            <button id="pin-current-btn" class="icon-btn" title="ピン留め"><i data-lucide="pin" class="w-4 h-4"></i></button>
+            <button id="add-child-btn" class="text-btn" title="サブページを追加"><i data-lucide="file-plus" class="w-3.5 h-3.5"></i>サブページ</button>
+            <button id="import-from-notion-btn" class="text-btn"><i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5"></i>Notionから</button>
+            <button id="send-to-notion-btn" class="text-btn"><i data-lucide="arrow-up-from-line" class="w-3.5 h-3.5"></i>Notionへ</button>
+          </div>
+          <div class="px-4 py-1.5 border-b border-gaze-border flex items-center gap-2 bg-gaze-surface/30 flex-wrap">
+            <div class="flex items-center gap-0.5">
+              <button data-md="h1" class="tb-btn" title="見出し1"><span class="text-[11px] font-bold">H1</span></button>
+              <button data-md="h2" class="tb-btn" title="見出し2"><span class="text-[11px] font-bold">H2</span></button>
+              <span class="tb-sep"></span>
+              <button data-md="bold" class="tb-btn" title="太字"><i data-lucide="bold" class="w-3.5 h-3.5"></i></button>
+              <button data-md="italic" class="tb-btn" title="斜体"><i data-lucide="italic" class="w-3.5 h-3.5"></i></button>
+              <button data-md="strike" class="tb-btn" title="取り消し線"><i data-lucide="strikethrough" class="w-3.5 h-3.5"></i></button>
+              <span class="tb-sep"></span>
+              <button data-md="ul" class="tb-btn" title="箇条書き"><i data-lucide="list" class="w-3.5 h-3.5"></i></button>
+              <button data-md="ol" class="tb-btn" title="番号付きリスト"><i data-lucide="list-ordered" class="w-3.5 h-3.5"></i></button>
+              <button data-md="task" class="tb-btn" title="チェックリスト"><i data-lucide="list-checks" class="w-3.5 h-3.5"></i></button>
+              <span class="tb-sep"></span>
+              <button data-md="quote" class="tb-btn" title="引用"><i data-lucide="quote" class="w-3.5 h-3.5"></i></button>
+              <button data-md="code" class="tb-btn" title="コード"><i data-lucide="code" class="w-3.5 h-3.5"></i></button>
+              <button data-md="link" class="tb-btn" title="リンク"><i data-lucide="link" class="w-3.5 h-3.5"></i></button>
+              <button data-md="wikilink" class="tb-btn" title="WikiLink [[ ]]"><i data-lucide="brackets" class="w-3.5 h-3.5"></i></button>
+            </div>
+            <div class="ml-auto flex items-center gap-2">
+              <div class="relative" id="outline-wrap">
+                <button id="outline-btn" class="tb-btn" title="見出し一覧"><i data-lucide="list-tree" class="w-3.5 h-3.5"></i></button>
+                <div id="outline-menu" class="hidden absolute right-0 top-full mt-1 z-40 bg-gaze-surface border border-gaze-border rounded-lg shadow-2xl w-60 max-h-64 overflow-y-auto py-1 px-1"></div>
+              </div>
+              <div class="flex rounded-lg border border-gaze-border overflow-hidden">
+                <button data-mode="edit" class="mode-btn active" title="編集"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                <button data-mode="split" class="mode-btn" title="分割"><i data-lucide="columns-2" class="w-3.5 h-3.5"></i></button>
+                <button data-mode="preview" class="mode-btn" title="プレビュー"><i data-lucide="eye" class="w-3.5 h-3.5"></i></button>
+              </div>
+            </div>
+          </div>
+          <div id="editor-area" class="flex-1 overflow-hidden flex min-h-0">
+            <div id="edit-pane" class="flex-1 overflow-y-auto min-w-0"><div class="max-w-3xl mx-auto p-8">
+              <textarea id="note-content" placeholder="Markdownで思考を整理する。[[ でWikiLink補完、#でタグ。" class="textarea-editor w-full min-h-[55vh] bg-transparent border-none outline-none resize-none text-slate-200 placeholder-slate-600 leading-relaxed"></textarea>
+            </div></div>
+            <div id="preview-pane" class="flex-1 overflow-y-auto min-w-0 hidden border-l border-gaze-border"><div id="preview-content" class="prose prose-invert max-w-3xl mx-auto p-8 text-slate-200"></div></div>
+            <div id="wikilink-modal" class="hidden fixed z-50 bg-gaze-surface border border-gaze-border rounded-xl shadow-2xl w-72 max-h-64 overflow-y-auto fade-in"><div id="wikilink-suggestions"></div></div>
+          </div>
+          <div id="backlinks-panel" class="hidden border-t border-gaze-border bg-gaze-surface/20">
+            <button id="backlinks-toggle" class="w-full px-6 py-2 flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors">
+              <i data-lucide="corner-up-left" class="w-3.5 h-3.5"></i><span>このノートを参照</span><span id="backlinks-count" class="text-blue-400 font-semibold">0</span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 ml-auto transition-transform" id="backlinks-chevron"></i>
+            </button>
+            <div id="backlinks-list" class="px-6 pb-3 flex flex-col gap-0.5"></div>
+          </div>
+          <div id="related-panel" class="hidden border-t border-gaze-border bg-gaze-surface/20">
+            <div class="px-6 py-2 flex items-center gap-2">
+              <i data-lucide="network" class="w-3.5 h-3.5 text-blue-400"></i><span class="text-xs text-slate-400 font-medium">潜在的なつながり</span>
+              <button id="ai-suggest-links-btn" class="ml-auto flex items-center gap-1.5 text-[11px] text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2.5 py-1 rounded-md transition-all"><i data-lucide="sparkles" class="w-3 h-3"></i>AIで提案</button>
+            </div>
+            <div id="related-local" class="px-6 pb-2 flex flex-wrap gap-1.5"></div>
+            <div id="related-ai" class="px-6 pb-3 space-y-1.5"></div>
+          </div>
+          <div id="subpages-wrap" class="hidden border-t border-gaze-border bg-gaze-surface/20 px-6 py-3">
+            <p class="text-xs text-slate-400 font-medium mb-2 flex items-center gap-1.5"><i data-lucide="files" class="w-3.5 h-3.5"></i>サブページ</p>
+            <div id="subpages" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div class="px-6 py-1.5 border-t border-gaze-border flex items-center gap-4 text-[11px] text-slate-500 bg-gaze-surface/30">
+            <span><span id="stat-chars">0</span> 文字</span><span><span id="stat-words">0</span> 語</span>
+            <span>読了 <span id="stat-read">—</span></span><span><span id="stat-links">0</span> リンク</span>
+            <span class="ml-auto" id="save-status">準備完了</span>
+          </div>
+        </div>
+        <aside id="ai-drawer" class="hidden w-[360px] border-l border-gaze-border flex-col bg-gaze-surface flex-shrink-0">
+          <div class="p-4 border-b border-gaze-border">
+            <div class="flex items-center gap-2 mb-3">
+              <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center"><i data-lucide="sparkles" class="w-4 h-4 text-white"></i></div>
+              <h2 class="text-base font-semibold text-white flex-1" style="letter-spacing:-0.02em;">AI Assistant</h2>
+              <button id="close-ai-btn" class="icon-btn !w-6 !h-6"><i data-lucide="x" class="w-4 h-4"></i></button>
+            </div>
+            <select id="model-select" class="w-full bg-gaze-bg border border-gaze-border rounded-lg p-2.5 text-sm outline-none focus:border-gaze-accent transition-colors">
+              <option value="gemini">Gemini 1.5 Flash</option><option value="claude">Claude 3.5 Sonnet</option>
+              <option value="openai">GPT-4o</option><option value="ollama">Ollama (Local)</option>
+            </select>
+          </div>
+          <div class="p-3 border-b border-gaze-border">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 px-1" style="letter-spacing:.05em;">Quick Actions</p>
+            <div class="flex flex-wrap gap-2">
+              <button data-action="summarize" class="ai-action-btn flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-xs transition-all hover:border-blue-500/50"><i data-lucide="file-text" class="w-3.5 h-3.5"></i>要約</button>
+              <button data-action="ideas" class="ai-action-btn flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-xs transition-all hover:border-blue-500/50"><i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>関連アイデア</button>
+              <button data-action="questions" class="ai-action-btn flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-xs transition-all hover:border-blue-500/50"><i data-lucide="circle-help" class="w-3.5 h-3.5"></i>疑問点</button>
+            </div>
+          </div>
+          <div class="p-3 border-b border-gaze-border">
+            <div class="flex items-center justify-between mb-2 px-1">
+              <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider" style="letter-spacing:.05em;">Custom Prompts</p>
+              <button id="add-template-btn" class="icon-btn !w-6 !h-6" title="テンプレートを追加"><i data-lucide="plus" class="w-3.5 h-3.5"></i></button>
+            </div>
+            <div id="template-list" class="flex flex-wrap gap-2"></div>
+          </div>
+          <div id="chat-container" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+          <div class="p-3 border-t border-gaze-border bg-gaze-surface">
+            <div class="flex gap-2">
+              <input id="chat-input" type="text" placeholder="AIに質問..." class="flex-1 bg-gaze-bg border border-gaze-border rounded-lg px-4 py-2.5 outline-none focus:border-gaze-accent text-sm transition-colors">
+              <button id="chat-send-btn" class="btn-primary text-white px-4 rounded-lg flex items-center gap-1.5"><i data-lucide="send" class="w-4 h-4"></i></button>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <!-- GRAPH VIEW -->
+      <section id="view-graph" class="view hidden relative">
+        <div id="graph-3d" class="w-full h-full"></div>
+        <div class="absolute top-4 left-4 bg-gaze-surface/80 border border-gaze-border rounded-lg px-3 py-2 text-[11px] text-slate-400 backdrop-blur">
+          <p class="font-semibold text-slate-200 mb-1">思考ネットワーク</p>
+          <p>ドラッグで回転・ノードをクリックで開く</p>
+        </div>
+        <div class="absolute top-4 right-4 flex flex-col gap-2">
+          <button id="graph-reset" class="icon-btn bg-gaze-surface border border-gaze-border" title="視点リセット"><i data-lucide="maximize" class="w-4 h-4"></i></button>
+          <button id="graph-rotate" class="icon-btn bg-gaze-surface border border-gaze-border" title="自動回転"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- COMMAND PALETTE -->
+  <div id="palette-overlay" class="hidden fixed inset-0 modal-backdrop z-[60] flex items-start justify-center pt-[15vh] px-4">
+    <div class="bg-gaze-surface border border-gaze-border rounded-xl w-full max-w-xl shadow-2xl overflow-hidden">
+      <div class="flex items-center gap-2 px-4 py-3 border-b border-gaze-border">
+        <i data-lucide="search" class="w-4 h-4 text-slate-500"></i>
+        <input id="palette-input" class="flex-1 bg-transparent outline-none text-sm" placeholder="コマンドまたはノートを検索...">
+        <kbd class="text-[10px] text-slate-600 border border-gaze-border rounded px-1.5 py-0.5">esc</kbd>
+      </div>
+      <div id="palette-list" class="max-h-[50vh] overflow-y-auto py-1"></div>
+    </div>
+  </div>
+
+  <!-- MOVE MODAL -->
+  <div id="move-overlay" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+    <div class="bg-gaze-surface rounded-2xl p-6 w-full max-w-md border border-gaze-border shadow-2xl">
+      <h3 class="text-lg font-semibold text-white mb-1">ノートを移動</h3>
+      <p class="text-xs text-slate-500 mb-3">新しい親ページを選んでください</p>
+      <div id="move-list" class="max-h-[50vh] overflow-y-auto space-y-1"></div>
+      <div class="flex justify-end mt-4"><button id="move-cancel" class="px-4 py-2 rounded-lg text-slate-400 hover:text-slate-200 btn-ghost text-sm">キャンセル</button></div>
+    </div>
+  </div>
+
+  <!-- TEMPLATE MODAL -->
+  <div id="template-overlay" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+    <div class="bg-gaze-surface rounded-2xl p-6 w-full max-w-lg border border-gaze-border shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="template-modal-title" class="text-lg font-semibold text-white">新しいプロンプトテンプレート</h2>
+        <button id="template-close-btn" class="icon-btn"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="space-y-4">
+        <div><label class="block text-sm font-medium mb-1.5 text-slate-300">名前</label>
+          <input id="template-name" type="text" placeholder="例: SWOT分析" class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm"></div>
+        <div><label class="block text-sm font-medium mb-1.5 text-slate-300">プロンプト</label>
+          <textarea id="template-prompt" rows="6" placeholder="AIへの指示..." class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm resize-none leading-relaxed"></textarea>
+          <p class="text-xs text-slate-500 mt-1.5">開いているノートは自動でコンテキストに添付されます。<code class="text-blue-400">{{note}}</code> で本文を埋め込みます。</p></div>
+      </div>
+      <div class="flex items-center gap-3 mt-5">
+        <button id="template-delete-btn" class="hidden items-center gap-1.5 text-red-300 bg-red-500/15 hover:bg-red-500/25 border border-red-500/40 px-3 py-2 rounded-lg text-xs transition-all"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i>削除</button>
+        <div class="ml-auto flex gap-2"><button id="template-cancel-btn" class="px-4 py-2 rounded-lg text-slate-400 hover:text-slate-200 btn-ghost text-sm">キャンセル</button>
+        <button id="template-save-btn" class="btn-primary text-white px-5 py-2 rounded-lg text-sm">保存</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settings-overlay" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+    <div class="bg-gaze-surface rounded-2xl p-6 w-full max-w-2xl border border-gaze-border shadow-2xl max-h-[90vh] flex flex-col">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-xl font-semibold text-white" style="letter-spacing:-0.02em;">Settings</h2>
+        <button id="settings-close-btn" class="icon-btn"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="flex gap-6 border-b border-gaze-border mb-5">
+        <button class="tab-button active pb-3 text-sm font-medium text-slate-300" data-tab="ai">AI プロバイダー</button>
+        <button class="tab-button pb-3 text-sm font-medium text-slate-500" data-tab="integrations">連携</button>
+        <button class="tab-button pb-3 text-sm font-medium text-slate-500" data-tab="data">データ</button>
+      </div>
+      <div class="flex-1 overflow-y-auto">
+        <div id="tab-ai" class="tab-content space-y-5">
+          <div><label class="block text-sm font-medium mb-2 text-slate-300">Google Gemini API Key</label><input id="gemini-key" type="password" placeholder="AIza..." class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm"></div>
+          <div><label class="block text-sm font-medium mb-2 text-slate-300">Anthropic Claude API Key</label><input id="claude-key" type="password" placeholder="sk-ant-..." class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm"></div>
+          <div><label class="block text-sm font-medium mb-2 text-slate-300">OpenAI API Key</label><input id="openai-key" type="password" placeholder="sk-..." class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm"></div>
+          <div><label class="block text-sm font-medium mb-2 text-slate-300">Ollama Endpoint</label><input id="ollama-endpoint" type="text" value="http://localhost:11434" class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm"></div>
+        </div>
+        <div id="tab-integrations" class="tab-content hidden space-y-4">
+          <div><label class="block text-sm font-medium mb-1.5 text-slate-300">Notion Integration Token</label><input id="notion-token" type="password" placeholder="secret_..." class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm"></div>
+          <div><label class="block text-sm font-medium mb-1.5 text-slate-300">送信先 Page ID</label><input id="notion-page-id" type="text" class="w-full bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm"></div>
+        </div>
+        <div id="tab-data" class="tab-content hidden space-y-4">
+          <div class="flex gap-2">
+            <button id="export-all-btn" class="flex-1 flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-sm"><i data-lucide="download" class="w-4 h-4"></i>全データ書き出し</button>
+            <button id="import-data-btn" class="flex-1 flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-sm"><i data-lucide="upload" class="w-4 h-4"></i>JSON読み込み</button>
+          </div>
+          <input type="file" id="import-file-input" accept=".json,.md" class="hidden">
+          <button id="reset-all-btn" class="flex items-center gap-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 px-3 py-2 rounded-lg text-sm"><i data-lucide="trash-2" class="w-4 h-4"></i>すべてのデータを削除</button>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-5 pt-4 border-t border-gaze-border">
+        <button id="settings-cancel-btn" class="px-4 py-2 rounded-lg text-slate-400 hover:text-slate-200 btn-ghost text-sm">キャンセル</button>
+        <button id="settings-save-btn" class="btn-primary text-white px-5 py-2 rounded-lg text-sm">設定を保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NOTION IMPORT MODAL -->
+  <div id="notion-overlay" class="hidden fixed inset-0 modal-backdrop z-50 flex items-center justify-center p-4">
+    <div class="bg-gaze-surface rounded-2xl p-6 w-full max-w-3xl border border-gaze-border shadow-2xl max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-xl font-semibold text-white">Notion からインポート</h2>
+        <button id="notion-close-btn" class="icon-btn"><i data-lucide="x" class="w-5 h-5"></i></button>
+      </div>
+      <div class="mb-4 flex gap-2">
+        <input id="notion-search-input" type="text" placeholder="ページを検索..." class="flex-1 bg-gaze-bg border border-gaze-border rounded-lg px-3 py-2.5 outline-none focus:border-gaze-accent text-sm">
+        <button id="notion-refresh-btn" class="btn-ghost px-3 py-2 rounded-lg border border-gaze-border"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+      </div>
+      <div id="notion-pages-container" class="flex-1 overflow-y-auto space-y-2"></div>
+    </div>
+  </div>
+<script>
+(function(){
+  function show(msg){var d=document.getElementById('gaze-dbg');
+    if(!d){d=document.createElement('div');d.id='gaze-dbg';
+      d.style.cssText='position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;font-size:12px;padding:10px;z-index:99999;white-space:pre-wrap;';
+      document.documentElement.appendChild(d);}
+    d.textContent=msg;}
+  window.addEventListener('error',function(e){show('JS Error: '+e.message+' (line '+(e.lineno||'?')+')');});
+  window.addEventListener('unhandledrejection',function(e){show('非同期エラー: '+((e.reason&&e.reason.message)?e.reason.message:e.reason));});
+  if(!window.lucide){window.lucide={createIcons:function(){}};show('注意: Lucideが読込めないためアイコンを省略して動作します');}
+})();
+</script>
+  <script type="module">
+    const DB_NAME='TheGazeDB',DB_VERSION=1,NOTES_STORE='notes';
+    class TheGazeDB{
+      static async open(){return new Promise((res,rej)=>{const r=indexedDB.open(DB_NAME,DB_VERSION);
+        r.onerror=()=>rej(new Error('IndexedDB open failed'));r.onsuccess=()=>res(r.result);
+        r.onupgradeneeded=(e)=>{const db=e.target.result;if(!db.objectStoreNames.contains(NOTES_STORE)){const s=db.createObjectStore(NOTES_STORE,{keyPath:'id'});s.createIndex('updatedAt','updatedAt',{unique:false});}};});}
+      static async addNote(note){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction(NOTES_STORE,'readwrite').objectStore(NOTES_STORE).put(note);r.onsuccess=()=>res(note);r.onerror=()=>rej(new Error('save failed'));});}
+      static async deleteNote(id){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction(NOTES_STORE,'readwrite').objectStore(NOTES_STORE).delete(id);r.onsuccess=()=>res();r.onerror=()=>rej(new Error('delete failed'));});}
+      static async getAllNotes(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction(NOTES_STORE,'readonly').objectStore(NOTES_STORE).getAll();r.onsuccess=()=>{const n=r.result||[];res(n.sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)));};r.onerror=()=>rej(new Error('fetch failed'));});}
+      static async getNote(id){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction(NOTES_STORE,'readonly').objectStore(NOTES_STORE).get(id);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(new Error('get failed'));});}
+    }
+
+    const state={currentNote:null,saveTimeout:null,isSaving:false,wikilinkActive:false,searchQuery:'',activeTag:null,previewTimeout:null,backlinksOpen:true,aiSuggestions:[]};
+    let editorMode='edit',currentView='library';
+    const expandedIds=new Set(JSON.parse(localStorage.getItem('gaze_expanded')||'[]'));
+    function saveExpanded(){localStorage.setItem('gaze_expanded',JSON.stringify([...expandedIds]));}
+
+    function escapeHtml(t){if(!t)return'';const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+    function escapeAttr(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+    function escapeRegExp(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+    function newId(){return'note_'+Date.now()+'_'+Math.random().toString(36).substring(2,7);}
+    function formatCharCount(n){if(n>=10000)return(n/10000).toFixed(1)+'万';if(n>=1000)return(n/1000).toFixed(1)+'k';return String(n);}
+    function formatDate(ts){if(!ts)return'';const diff=Date.now()-new Date(ts);
+      if(diff<60000)return'たった今';if(diff<3600000)return Math.floor(diff/60000)+'分前';
+      if(diff<86400000)return Math.floor(diff/3600000)+'時間前';if(diff<604800000)return Math.floor(diff/86400000)+'日前';
+      return new Date(ts).toLocaleDateString('ja-JP',{month:'short',day:'numeric'});}
+    function truncateText(t,m=60){if(!t)return'';const c=t.replace(/\n+/g,' ').trim();return c.length>m?c.substring(0,m)+'...':c;}
+    function setSaveStatus(s){const el=document.getElementById('save-status');if(el)el.textContent=s;}
+    function showToast(message,type='success'){document.querySelectorAll('.gaze-toast').forEach(t=>t.remove());
+      const toast=document.createElement('div');
+      toast.className='gaze-toast fixed bottom-4 right-4 px-4 py-3 rounded-lg shadow-2xl z-[70] fade-in transition-all duration-300 border-l-4 '+(type==='error'?'bg-red-600/95 border border-red-500 border-l-red-200':'bg-slate-800/95 border border-slate-700 border-l-blue-400');
+      toast.innerHTML='<span class="text-sm font-medium text-white">'+escapeHtml(message)+'</span>';
+      document.body.appendChild(toast);setTimeout(()=>{toast.style.opacity='0';toast.style.transform='translateY(10px)';setTimeout(()=>toast.remove(),300);},3000);}
+
+    function extractTags(text){const tags=new Set();if(!text)return[];const re=/(?:^|\s)#([^\s#]+)/g;let m;
+      while((m=re.exec(text))!==null){let tag=m[1].replace(/[.,!?;:、。()（）\[\]{}]+$/,'');if(tag.length>0&&!/^\d+$/.test(tag))tags.add(tag);}return[...tags];}
+
+    function setView(name){
+      currentView=name;
+      document.querySelectorAll('.view').forEach(v=>v.classList.add('hidden'));
+      const v=document.getElementById('view-'+name);if(v)v.classList.remove('hidden');
+      document.querySelectorAll('.activity-btn[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===name));
+      if(name==='graph')requestAnimationFrame(()=>initGraph());
+      if(name==='library'){renderTree();renderDashboard();}
+      if(name==='editor'){renderBreadcrumb();renderSubpages();}
+    }
+
+    function treeNodeHTML(n,depth,byParent){
+      const kids=byParent[n.id]||[],hasKids=kids.length>0,expanded=expandedIds.has(n.id);
+      const active=state.currentNote&&state.currentNote.id===n.id?'active':'';
+      let html='<div class="tree-node '+active+'" data-id="'+n.id+'" style="padding-left:'+(8+depth*14)+'px">'
+        +'<button class="tree-caret" data-caret="'+n.id+'" '+(hasKids?'':'style="visibility:hidden"')+'><i data-lucide="'+(expanded?'chevron-down':'chevron-right')+'" class="w-3 h-3"></i></button>'
+        +'<i data-lucide="'+(n.pinned?'pin':'file-text')+'" class="w-3.5 h-3.5 tree-icon"></i>'
+        +'<span class="tree-title truncate">'+escapeHtml(n.title||'Untitled')+'</span>'
+        +'<button class="tree-add-child" data-addchild="'+n.id+'" title="サブページを追加"><i data-lucide="plus" class="w-3 h-3"></i></button></div>';
+      if(hasKids&&expanded)for(const k of kids)html+=treeNodeHTML(k,depth+1,byParent);
+      return html;
+    }
+    async function renderTree(){
+      const all=await TheGazeDB.getAllNotes();
+      const container=document.getElementById('page-tree');
+      let list=all;
+      if(state.activeTag)list=list.filter(n=>extractTags((n.title||'')+' '+(n.content||'')).includes(state.activeTag));
+      const q=state.searchQuery.toLowerCase();
+      if(q)list=list.filter(n=>(n.title||'').toLowerCase().includes(q)||(n.content||'').toLowerCase().includes(q));
+      const filtering=q||state.activeTag;
+      if(list.length===0){container.innerHTML='<p class="text-xs text-slate-600 text-center py-6">ページがありません</p>';return;}
+      if(filtering){
+        container.innerHTML=list.map(n=>'<div class="tree-node" data-id="'+n.id+'" style="padding-left:8px"><i data-lucide="file-text" class="w-3.5 h-3.5 tree-icon"></i><span class="tree-title truncate">'+escapeHtml(n.title||'Untitled')+'</span></div>').join('');
+      }else{
+        const byParent={},roots=[],ids=new Set(all.map(n=>n.id));
+        const sortFn=(a,b)=>((b.pinned?1:0)-(a.pinned?1:0))||((b.updatedAt||0)-(a.updatedAt||0));
+        for(const n of all){if(n.parentId&&ids.has(n.parentId))(byParent[n.parentId]||=[]).push(n);else roots.push(n);}
+        roots.sort(sortFn);Object.values(byParent).forEach(a=>a.sort(sortFn));
+        container.innerHTML=roots.map(n=>treeNodeHTML(n,0,byParent)).join('');
+      }
+      lucide.createIcons();
+      container.querySelectorAll('.tree-node').forEach(nd=>{
+        nd.addEventListener('click',(e)=>{if(e.target.closest('.tree-caret')||e.target.closest('.tree-add-child'))return;openNoteById(nd.dataset.id);});});
+      container.querySelectorAll('.tree-caret').forEach(c=>c.addEventListener('click',(e)=>{
+        e.stopPropagation();const id=c.dataset.caret;
+        if(expandedIds.has(id))expandedIds.delete(id);else expandedIds.add(id);
+        saveExpanded();renderTree();}));
+      container.querySelectorAll('.tree-add-child').forEach(b=>b.addEventListener('click',(e)=>{
+        e.stopPropagation();createChildNote(b.dataset.addchild);}));
+    }
+
+    async function renderDashboard(){
+      const notes=await TheGazeDB.getAllNotes();
+      let totalChars=0,totalLinks=0,richSum=0,richCount=0;
+      notes.forEach(n=>{totalChars+=(n.content||'').length;const m=(n.content||'').match(/\[\[[^\]]+\]\]/g);if(m)totalLinks+=m.length;if(n.richness){richSum+=n.richness.score;richCount++;}});
+      document.getElementById('stat-notes').textContent=notes.length;
+      document.getElementById('stat-total-chars').textContent=formatCharCount(totalChars);
+      document.getElementById('stat-total-links').textContent=totalLinks;
+      document.getElementById('stat-avg-rich').textContent=richCount?Math.round(richSum/richCount):'—';
+      const counts={};notes.forEach(n=>extractTags((n.title||'')+' '+(n.content||'')).forEach(t=>counts[t]=(counts[t]||0)+1));
+      const tags=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).slice(0,20);
+      const tagEl=document.getElementById('dash-tags');
+      tagEl.innerHTML=tags.length?tags.map(t=>'<button class="tag-chip '+(state.activeTag===t?'active':'')+'" data-tag="'+escapeAttr(t)+'">#'+escapeHtml(t)+' <span class="opacity-50">'+counts[t]+'</span></button>').join(''):'<p class="text-xs text-slate-600">タグがありません</p>';
+      tagEl.querySelectorAll('.tag-chip').forEach(c=>c.addEventListener('click',()=>{state.activeTag=state.activeTag===c.dataset.tag?null:c.dataset.tag;renderTree();renderDashboard();}));
+      const recent=notes.slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0)).slice(0,8);
+      const rel=document.getElementById('recent-list');
+      rel.innerHTML=recent.length?recent.map(n=>'<button class="recent-item" data-id="'+n.id+'"><i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500 flex-shrink-0"></i><span class="truncate flex-1 text-left text-sm text-slate-300">'+escapeHtml(n.title||'Untitled')+'</span><span class="text-[10px] text-slate-600 flex-shrink-0">'+formatDate(n.updatedAt)+'</span></button>').join('')
+        :'<p class="text-xs text-slate-600">まだノートがありません。</p>';
+      lucide.createIcons();
+      rel.querySelectorAll('.recent-item').forEach(b=>b.addEventListener('click',()=>openNoteById(b.dataset.id)));
+      refreshGrowth();
+    }
+    async function renderNotesList(){await renderTree();await renderDashboard();}
+
+    async function openNoteById(id){await loadNote(id);setView('editor');}
+    async function createNote(){const note={id:newId(),title:'',content:'',parentId:null,createdAt:Date.now(),updatedAt:Date.now()};
+      await TheGazeDB.addNote(note);await renderTree();openNoteById(note.id);showToast('新しいノートを作成しました','success');
+      setTimeout(()=>document.getElementById('note-title').focus(),100);refreshGrowth();}
+    async function createChildNote(parentId){const note={id:newId(),title:'',content:'',parentId,createdAt:Date.now(),updatedAt:Date.now()};
+      await TheGazeDB.addNote(note);expandedIds.add(parentId);saveExpanded();await renderTree();openNoteById(note.id);
+      setTimeout(()=>document.getElementById('note-title').focus(),100);refreshGrowth();}
+    async function loadNote(id){try{const note=await TheGazeDB.getNote(id);
+      if(!note){showToast('ノートが見つかりません','error');return;}
+      state.currentNote=note;
+      document.getElementById('note-title').value=note.title||'';
+      document.getElementById('note-content').value=note.content||'';
+      updateStats();updatePinButton();setSaveStatus('読み込み完了');
+      state.aiSuggestions=[];renderAiSuggestions();
+      await renderTree();renderBreadcrumb();renderSubpages();updateBacklinks();renderRelatedPanel();
+      if(editorMode!=='edit')renderPreview();
+    }catch(e){showToast('ノートの読み込みに失敗しました','error');console.error(e);}}
+    async function saveNote(){if(!state.currentNote||state.isSaving)return;
+      state.isSaving=true;setSaveStatus('保存中...');
+      state.currentNote.title=document.getElementById('note-title').value;
+      state.currentNote.content=document.getElementById('note-content').value;
+      state.currentNote.updatedAt=Date.now();
+      try{await TheGazeDB.addNote(state.currentNote);await renderTree();renderBreadcrumb();updateBacklinks();renderRelatedPanel();
+        setSaveStatus('保存完了');setTimeout(()=>setSaveStatus('準備完了'),2000);refreshGrowth();}
+      catch(e){showToast('保存に失敗しました','error');setSaveStatus('保存失敗');console.error(e);}
+      finally{state.isSaving=false;}}
+    function scheduleSave(){setSaveStatus('編集中...');clearTimeout(state.saveTimeout);state.saveTimeout=setTimeout(()=>{saveNote();},800);}
+    async function deleteNote(id){const note=await TheGazeDB.getNote(id);if(!confirm('「'+(note?note.title:'Untitled')+'」を削除しますか？'))return;
+      try{await TheGazeDB.deleteNote(id);
+        if(state.currentNote&&state.currentNote.id===id){state.currentNote=null;setView('library');}
+        await renderTree();renderDashboard();showToast('ノートを削除しました','success');refreshGrowth();
+      }catch(e){showToast('削除に失敗しました','error');console.error(e);}}
+    async function togglePin(id){const note=await TheGazeDB.getNote(id);if(!note)return;
+      note.pinned=!note.pinned;note.updatedAt=Date.now();await TheGazeDB.addNote(note);
+      if(state.currentNote&&state.currentNote.id===id){state.currentNote=note;updatePinButton();}await renderTree();}
+    function updatePinButton(){const btn=document.getElementById('pin-current-btn');if(btn)btn.classList.toggle('active',!!(state.currentNote&&state.currentNote.pinned));}
+    function updateStats(){const content=document.getElementById('note-content').value;const chars=content.length;
+      const words=content.trim()?content.trim().split(/\s+/).length:0;
+      document.getElementById('stat-chars').textContent=chars.toLocaleString();
+      document.getElementById('stat-words').textContent=words.toLocaleString();
+      document.getElementById('stat-read').textContent=chars>0?Math.max(1,Math.ceil(chars/500))+'分':'—';
+      document.getElementById('stat-links').textContent=(content.match(/\[\[[^\]]+\]\]/g)||[]).length;}
+
+    async function renderBreadcrumb(){const bc=document.getElementById('breadcrumb');if(!state.currentNote){bc.innerHTML='';return;}
+      const notes=await TheGazeDB.getAllNotes();const map={};notes.forEach(n=>map[n.id]=n);
+      const chain=[];let cur=state.currentNote,guard=0;
+      while(cur&&guard<20){chain.unshift(cur);cur=cur.parentId?map[cur.parentId]:null;guard++;}
+      bc.innerHTML=chain.map((n,i)=>'<span class="flex items-center gap-1 min-w-0">'+(i>0?'<i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 flex-shrink-0"></i>':'')
+        +'<button class="crumb truncate '+(n.id===state.currentNote.id?'text-slate-200':'text-slate-500 hover:text-slate-300')+'" data-id="'+n.id+'">'+escapeHtml(n.title||'Untitled')+'</button></span>').join('');
+      lucide.createIcons();
+      bc.querySelectorAll('.crumb').forEach(b=>b.addEventListener('click',()=>openNoteById(b.dataset.id)));}
+    async function renderSubpages(){const wrap=document.getElementById('subpages-wrap'),el=document.getElementById('subpages');
+      if(!state.currentNote){wrap.classList.add('hidden');return;}
+      const notes=await TheGazeDB.getAllNotes();
+      const kids=notes.filter(n=>n.parentId===state.currentNote.id).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+      if(kids.length===0){wrap.classList.add('hidden');return;}
+      wrap.classList.remove('hidden');
+      el.innerHTML=kids.map(k=>'<button class="subpage-card" data-id="'+k.id+'"><i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500 flex-shrink-0"></i><span class="truncate text-xs text-slate-300">'+escapeHtml(k.title||'Untitled')+'</span></button>').join('');
+      lucide.createIcons();
+      el.querySelectorAll('.subpage-card').forEach(b=>b.addEventListener('click',()=>openNoteById(b.dataset.id)));}
+
+    function openMoveModal(){if(!state.currentNote){showToast('ノートを開いてください','error');return;}buildMoveList();document.getElementById('move-overlay').classList.remove('hidden');}
+    async function buildMoveList(){const notes=await TheGazeDB.getAllNotes();const cur=state.currentNote;
+      const exclude=new Set([cur.id]);let changed=true;
+      while(changed){changed=false;for(const n of notes){if(n.parentId&&exclude.has(n.parentId)&&!exclude.has(n.id)){exclude.add(n.id);changed=true;}}}
+      const candidates=notes.filter(n=>!exclude.has(n.id)).sort((a,b)=>(a.title||'').localeCompare(b.title||'','ja'));
+      const el=document.getElementById('move-list');
+      el.innerHTML='<button class="move-item" data-parent=""><i data-lucide="home" class="w-3.5 h-3.5 text-slate-500"></i>ルート（最上位）</button>'+
+        candidates.map(n=>'<button class="move-item" data-parent="'+n.id+'"><i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500"></i><span class="truncate">'+escapeHtml(n.title||'Untitled')+'</span></button>').join('');
+      lucide.createIcons();
+      el.querySelectorAll('.move-item').forEach(b=>b.addEventListener('click',async()=>{
+        cur.parentId=b.dataset.parent||null;cur.updatedAt=Date.now();await TheGazeDB.addNote(cur);
+        document.getElementById('move-overlay').classList.add('hidden');
+        await renderTree();renderBreadcrumb();showToast('ノートを移動しました','success');}));}
+
+    function handleEditorInput(e){const ta=e.target,value=ta.value,pos=ta.selectionStart;
+      const before=value.substring(0,pos);const match=before.match(/\[\[([^\[\]\n]*)$/);
+      if(match){state.wikilinkActive=true;showWikilinkSuggestions(match[1],ta);}else hideWikilinkModal();
+      updateStats();schedulePreview();}
+    async function showWikilinkSuggestions(query,ta){const modal=document.getElementById('wikilink-modal'),container=document.getElementById('wikilink-suggestions');
+      let notes=[];try{notes=await TheGazeDB.getAllNotes();}catch(e){return;}
+      const filtered=notes.filter(n=>n.title&&n.title.toLowerCase().includes(query.toLowerCase())&&n.id!==state.currentNote.id).slice(0,8);
+      if(filtered.length===0){hideWikilinkModal();return;}
+      const rect=ta.getBoundingClientRect();const before=ta.value.substring(0,ta.selectionStart);const lines=before.split('\n');
+      const top=rect.top+((lines.length-1)*24)-ta.scrollTop+30;const left=Math.min(rect.left+(lines[lines.length-1].length*9),rect.right-288);
+      modal.style.left=Math.max(rect.left,left)+'px';modal.style.top=Math.min(top,window.innerHeight-300)+'px';modal.classList.remove('hidden');
+      container.innerHTML=filtered.map(n=>'<div class="wikilink-suggestion" data-note-id="'+n.id+'"><div class="text-sm text-slate-200 truncate">'+escapeHtml(n.title)+'</div></div>').join('');
+      container.querySelectorAll('.wikilink-suggestion').forEach(el=>el.addEventListener('click',async()=>{const s=await TheGazeDB.getNote(el.dataset.noteId);if(s&&s.title)insertWikilink(s.title,ta);}));}
+    function hideWikilinkModal(){state.wikilinkActive=false;document.getElementById('wikilink-modal').classList.add('hidden');}
+    function insertWikilink(title,ta){const pos=ta.selectionStart,value=ta.value,before=value.substring(0,pos);
+      const match=before.match(/\[\[([^\[\]\n]*)$/);
+      if(match){const start=pos-match[1].length-2;const ins='[['+title+']]';ta.value=value.substring(0,start)+ins+value.substring(pos);
+        ta.selectionStart=ta.selectionEnd=start+ins.length;ta.focus();scheduleSave();}
+      hideWikilinkModal();}
+    function applyMd(action){const ta=document.getElementById('note-content');const s=ta.selectionStart,e=ta.selectionEnd,sel=ta.value.substring(s,e);
+      const wrapSel=(pre,suf)=>{ta.setRangeText(pre+sel+suf,s,e,'end');if(s===e){ta.selectionStart=ta.selectionEnd=s+pre.length;}else{ta.selectionStart=s+pre.length;ta.selectionEnd=s+pre.length+sel.length;}};
+      const linePrefix=(prefix)=>{const val=ta.value;const ls=val.lastIndexOf('\n',s-1)+1;let le=val.indexOf('\n',e);if(le===-1)le=val.length;
+        const lines=val.substring(ls,le).split('\n');const stripRe=/^(#{1,6}\s+|>\s+|- \[[ x]\]\s+|- |\d+\.\s+)/;
+        const allHave=lines.every(l=>l.startsWith(prefix));
+        ta.setRangeText(lines.map(l=>allHave?l.slice(prefix.length):prefix+l.replace(stripRe,'')).join('\n'),ls,le,'select');};
+      const insertText=(text,offset)=>{ta.setRangeText(text,s,e,'end');ta.selectionStart=ta.selectionEnd=s+text.length+(offset||0);};
+      if(action==='bold')wrapSel('**','**');else if(action==='italic')wrapSel('*','*');else if(action==='strike')wrapSel('~~','~~');
+      else if(action==='code')wrapSel('\u0060','\u0060');else if(action==='h1')linePrefix('# ');else if(action==='h2')linePrefix('## ');
+      else if(action==='ul')linePrefix('- ');else if(action==='ol')linePrefix('1. ');else if(action==='task')linePrefix('- [ ] ');else if(action==='quote')linePrefix('> ');
+      else if(action==='link'){if(sel){ta.setRangeText('['+sel+'](url)',s,e,'end');ta.selectionStart=s+sel.length+3;ta.selectionEnd=s+sel.length+6;}
+        else{ta.setRangeText('[テキスト](url)',s,e,'end');ta.selectionStart=s+1;ta.selectionEnd=s+5;}}
+      else if(action==='wikilink')insertText('[[',0);else if(action==='hr')insertText('\n---\n',0);
+      ta.focus();scheduleSave();handleEditorInput({target:ta});}
+    function buildOutline(){const val=document.getElementById('note-content').value;const items=[];let pos=0;
+      for(const line of val.split('\n')){const m=line.match(/^(#{1,3})\s+(.+)/);if(m)items.push({level:m[1].length,text:m[2].trim(),pos});pos+=line.length+1;}return items;}
+    function jumpToPos(pos){const ta=document.getElementById('note-content');ta.focus();ta.selectionStart=ta.selectionEnd=pos;
+      const lineIdx=ta.value.substring(0,pos).split('\n').length-1;const lh=parseFloat(getComputedStyle(ta).lineHeight)||24;
+      ta.scrollTop=Math.max(0,lineIdx*lh-ta.clientHeight/3);}
+    function toggleOutlineMenu(){const menu=document.getElementById('outline-menu');
+      if(!menu.classList.contains('hidden')){menu.classList.add('hidden');return;}
+      const items=buildOutline();
+      menu.innerHTML=items.length===0?'<p class="text-xs text-slate-500 px-3 py-2">見出しがありません</p>':items.map(it=>'<button class="outline-item" data-pos="'+it.pos+'"><span style="opacity:'+(1-(it.level-1)*0.25)+'">'+escapeHtml(it.text)+'</span></button>').join('');
+      menu.classList.remove('hidden');
+      menu.querySelectorAll('.outline-item').forEach(b=>b.addEventListener('click',()=>{jumpToPos(parseInt(b.dataset.pos));menu.classList.add('hidden');}));}
+    function wikilinkify(text){return text.replace(/\[\[([^\[\]]+)\]\]/g,(m,name)=>'<a href="#" class="wikilink" data-wikilink="'+escapeAttr(name)+'">'+escapeHtml(name)+'</a>');}
+    function renderPreview(){const title=document.getElementById('note-title').value,content=document.getElementById('note-content').value;
+      const full=(title?'# '+title+'\n\n':'')+content;const el=document.getElementById('preview-content');
+      try{el.innerHTML=marked.parse(wikilinkify(full));}catch(e){el.textContent=full;}
+      el.querySelectorAll('a.wikilink').forEach(a=>a.addEventListener('click',(e)=>{e.preventDefault();openNoteByTitle(a.dataset.wikilink);}));}
+    function schedulePreview(){if(editorMode==='edit')return;clearTimeout(state.previewTimeout);state.previewTimeout=setTimeout(renderPreview,250);}
+    function setEditorMode(mode){editorMode=mode;const edit=document.getElementById('edit-pane'),prev=document.getElementById('preview-pane');
+      if(mode==='edit'){edit.classList.remove('hidden');prev.classList.add('hidden');}
+      else if(mode==='preview'){edit.classList.add('hidden');prev.classList.remove('hidden');renderPreview();}
+      else{edit.classList.remove('hidden');prev.classList.remove('hidden');renderPreview();}
+      prev.classList.toggle('border-l',mode==='split');
+      document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));}
+    async function openNoteByTitle(title){const notes=await TheGazeDB.getAllNotes();
+      const found=notes.find(n=>(n.title||'').toLowerCase()===title.toLowerCase());
+      if(found){openNoteById(found.id);return;}
+      if(confirm('「'+title+'」はまだ存在しません。作成しますか？')){const note={id:newId(),title,content:'',parentId:null,createdAt:Date.now(),updatedAt:Date.now()};
+        await TheGazeDB.addNote(note);await renderTree();openNoteById(note.id);refreshGrowth();}}
+
+    async function updateBacklinks(){const panel=document.getElementById('backlinks-panel'),listEl=document.getElementById('backlinks-list');
+      if(!state.currentNote||!state.currentNote.title){panel.classList.add('hidden');return;}
+      const title=state.currentNote.title;const notes=await TheGazeDB.getAllNotes();
+      const re=new RegExp('\\[\\['+escapeRegExp(title)+'\\]\\]','i');
+      const backs=notes.filter(n=>n.id!==state.currentNote.id&&n.content&&re.test(n.content));
+      if(backs.length===0){panel.classList.add('hidden');return;}
+      panel.classList.remove('hidden');document.getElementById('backlinks-count').textContent=backs.length;
+      listEl.innerHTML=backs.map(b=>'<button class="backlink-item" data-id="'+b.id+'"><i data-lucide="corner-up-left" class="w-3 h-3 flex-shrink-0"></i><span class="truncate">'+escapeHtml(b.title||'Untitled')+'</span></button>').join('');
+      lucide.createIcons();
+      listEl.querySelectorAll('.backlink-item').forEach(el=>el.addEventListener('click',()=>openNoteById(el.dataset.id)));
+      listEl.classList.toggle('hidden',!state.backlinksOpen);
+      document.getElementById('backlinks-chevron').style.transform=state.backlinksOpen?'rotate(180deg)':'rotate(0deg)';}
+    const JP_STOP=new Set(['する','した','して','ある','ない','いる','なる','こと','もの','ため','これ','それ','あれ','この','その','どこ','から','まで','より','ます','です','のが','として','について','において','または','および','そして','しかし','だから','つまり','例えば']);
+    const tokenCache=new Map();
+    function tokenizeNote(note){const text=(note.title||'')+'\n'+(note.content||'');
+      const cleaned=text.replace(new RegExp('\u0060\u0060\u0060[\\s\\S]*?\u0060\u0060\u0060','g'),' ').replace(new RegExp('\u0060[^\u0060]*\u0060','g'),' ');
+      const tokens=new Set();
+      for(const t of extractTags(cleaned))tokens.add('tag:'+t.toLowerCase());
+      const links=cleaned.match(/\[\[([^\]]+)\]\]/g);if(links)for(const l of links)tokens.add('link:'+l.slice(2,-2).trim().toLowerCase());
+      const words=cleaned.match(/[A-Za-z0-9_]{3,}/g);if(words)for(const w of words)tokens.add('w:'+w.toLowerCase());
+      const cjk=cleaned.match(/[\u3040-\u30ff\u4e00-\u9fff]{2,}/g);
+      if(cjk)for(const run of cjk)for(let i=0;i<run.length-1;i++){const bg=run.substr(i,2);if(!JP_STOP.has(bg))tokens.add('g:'+bg);}
+      return tokens;}
+    function getTokenSet(note){const key=note.id+':'+(note.updatedAt||0);if(tokenCache.has(key))return tokenCache.get(key);
+      if(tokenCache.size>200)tokenCache.clear();const t=tokenizeNote(note);tokenCache.set(key,t);return t;}
+    function computeRelated(current,notes){const cur=getTokenSet(current);if(cur.size<3)return[];const out=[];
+      for(const n of notes){if(n.id===current.id)continue;if(!(n.title||'').trim()&&!(n.content||'').trim())continue;
+        const toks=getTokenSet(n);if(toks.size===0)continue;let shared=0,weight=0;
+        const small=cur.size<=toks.size?cur:toks,big=cur.size<=toks.size?toks:cur;
+        for(const t of small)if(big.has(t)){shared++;weight+=t.startsWith('tag:')?3:t.startsWith('link:')?4:1;}
+        if(shared===0)continue;out.push({note:n,shared,weight,overlap:shared/small.size});}
+      out.sort((a,b)=>(b.weight+b.overlap*10)-(a.weight+a.overlap*10));return out.slice(0,6);}
+    async function renderRelatedPanel(){const panel=document.getElementById('related-panel'),localEl=document.getElementById('related-local');
+      if(!state.currentNote||!((state.currentNote.content||'').trim()||(state.currentNote.title||'').trim())){panel.classList.add('hidden');return;}
+      const notes=await TheGazeDB.getAllNotes();const related=computeRelated(state.currentNote,notes);
+      if(related.length===0)localEl.innerHTML='<span class="text-[11px] text-slate-600">ローカルの類似はまだありません。</span>';
+      else{localEl.innerHTML=related.map(r=>'<button class="related-chip" data-id="'+r.note.id+'"><span class="truncate max-w-[150px]">'+escapeHtml(r.note.title||'Untitled')+'</span><span class="related-score">'+Math.min(100,Math.round(r.overlap*100))+'%</span></button>').join('');
+        localEl.querySelectorAll('.related-chip').forEach(c=>c.addEventListener('click',()=>openNoteById(c.dataset.id)));}
+      renderAiSuggestions();panel.classList.remove('hidden');}
+    function renderAiSuggestions(){const aiEl=document.getElementById('related-ai');
+      if(state.aiSuggestions.length===0){aiEl.innerHTML='';return;}
+      aiEl.innerHTML='<p class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mt-1">AI 仮リンク</p>'+state.aiSuggestions.map((s,i)=>
+        '<div class="ai-link-item"><div class="flex-1 min-w-0"><span class="ai-link-title font-medium">'+escapeHtml(s.title)+'</span>'
+        +(s.reason?'<p class="text-[11px] text-slate-500 mt-0.5">'+escapeHtml(s.reason)+'</p>':'')+'</div>'
+        +'<button class="insert-link-btn text-btn flex-shrink-0" data-i="'+i+'"><i data-lucide="link" class="w-3 h-3"></i>挿入</button>'
+        +(s.noteId?'<button class="open-link-btn icon-btn flex-shrink-0" data-i="'+i+'"><i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i></button>':'')+'</div>').join('');
+      lucide.createIcons();
+      aiEl.querySelectorAll('.insert-link-btn').forEach(b=>b.addEventListener('click',()=>insertSuggestionLink(state.aiSuggestions[parseInt(b.dataset.i)].title)));
+      aiEl.querySelectorAll('.open-link-btn').forEach(b=>b.addEventListener('click',()=>{const s=state.aiSuggestions[parseInt(b.dataset.i)];if(s.noteId)openNoteById(s.noteId);}));}
+    function insertSuggestionLink(title){const ta=document.getElementById('note-content');const pos=ta.selectionStart||ta.value.length;
+      const before=ta.value.substring(0,pos),after=ta.value.substring(pos);
+      const pre=(before&&!/\s$/.test(before))?' ':'';const post=(after&&!/^\s/.test(after))?' ':'';
+      ta.setRangeText(pre+'[['+title+']]'+post,pos,pos,'end');ta.focus();scheduleSave();showToast('[['+title+']] を挿入しました','success');}
+    function parseSuggestionResponse(text){if(!text)return null;const m=text.match(/\{[\s\S]*\}/);
+      if(m){try{const o=JSON.parse(m[0]);if(Array.isArray(o.links))return o.links.filter(l=>l&&typeof l.index==='number').map(l=>({index:l.index,title:l.title||'',reason:l.reason||''}));}catch(e){}}
+      const am=text.match(/\[[\s\S]*\]/);if(am){try{const arr=JSON.parse(am[0]);if(Array.isArray(arr))return arr.filter(l=>l&&typeof l.index==='number').map(l=>({index:l.index,title:l.title||'',reason:l.reason||''}));}catch(e){}}
+      return null;}
+    async function aiSuggestLinks(){if(!state.currentNote){showToast('ノートを開いてください','error');return;}
+      const provider=getSelectedProvider(),apiKey=getProviderApiKey(provider),settings=getSettings();
+      if(provider!=='ollama'&&!apiKey){showToast(getProviderName(provider)+'のAPIキーが設定されていません','error');openSettings();return;}
+      const notes=await TheGazeDB.getAllNotes();
+      const candidates=notes.filter(n=>n.id!==state.currentNote.id&&((n.title||'').trim()||(n.content||'').trim()));
+      if(candidates.length===0){showToast('比較できる他のノートがありません','error');return;}
+      const localIds=new Set(computeRelated(state.currentNote,notes).map(r=>r.note.id));
+      const ordered=candidates.slice().sort((a,b)=>{const am=localIds.has(a.id)?0:1,bm=localIds.has(b.id)?0:1;if(am!==bm)return am-bm;return(b.updatedAt||0)-(a.updatedAt||0);}).slice(0,30);
+      const listText=ordered.map((n,i)=>(i+1)+'. タイトル: '+(n.title||'(無題)')+'\n   抜粋: '+truncateText((n.content||'').replace(/\n+/g,' '),80)).join('\n');
+      const btn=document.getElementById('ai-suggest-links-btn');const orig=btn.innerHTML;
+      btn.disabled=true;btn.innerHTML='<span class="thinking-dots"><span></span><span></span><span></span></span>';
+      const prompt='あなたは知識ベースの潜在的なつながりを見つけるアシスタントです。現在のノートと概念的に深くつながっているノートを候補から最大3つ選び、理由を添えてください。なければ空配列を返してください。\n必ずJSON形式のみで答えてください:\n{"links":[{"index":候補番号(整数),"title":"ノートのタイトル","reason":"理由(25字以内)"}]}\n\n現在のノート\nタイトル: '+(state.currentNote.title||'(無題)')+'\n本文:\n'+(state.currentNote.content||'').substring(0,4000)+'\n\n候補ノートリスト:\n'+listText;
+      try{const resp=await askLLM({provider,apiKey,endpoint:settings.ollamaEndpoint,prompt,context:''});
+        const parsed=parseSuggestionResponse(resp);if(!parsed)throw new Error('AIの応答を解析できませんでした');
+        state.aiSuggestions=parsed.map(p=>{const n=ordered[p.index-1];return{title:n?n.title:p.title,noteId:n?n.id:null,reason:p.reason||''};}).filter(s=>s.title);
+        renderAiSuggestions();if(state.aiSuggestions.length===0)showToast('AIは意味のあるつながりを見つけられませんでした','success');
+      }catch(err){showToast('AI提案に失敗: '+err.message,'error');console.error(err);}
+      finally{btn.disabled=false;btn.innerHTML=orig;lucide.createIcons();}}
+
+    let graphInstance=null;
+    function hashHue(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)%360;}
+    function nodeColor(n){if(n.pinned)return'#60a5fa';const tags=extractTags((n.title||'')+' '+(n.content||''));
+      if(tags.length)return'hsl('+hashHue(tags[0].toLowerCase())+',60%,60%)';return'#64748b';}
+    async function buildGraphData(){const notes=await TheGazeDB.getAllNotes();
+      const titleMap={};notes.forEach(n=>{if(n.title)titleMap[n.title.toLowerCase()]=n.id;});
+      const nodes=notes.map(n=>({id:n.id,name:n.title||'Untitled',val:Math.min(18,2+((n.content||'').length/300)),color:nodeColor(n)}));
+      const links=[],seen=new Set();
+      notes.forEach(n=>{const matches=(n.content||'').match(/\[\[([^\]]+)\]\]/g)||[];
+        matches.forEach(m=>{const t=m.slice(2,-2).trim().toLowerCase();const target=titleMap[t];
+          if(target&&target!==n.id){const key=[n.id,target].sort().join('|');if(!seen.has(key)){seen.add(key);links.push({source:n.id,target});}}});});
+      return{nodes,links};}
+    function initGraph(){const container=document.getElementById('graph-3d');if(!container)return;
+      if(typeof ForceGraph3D==='undefined'){container.innerHTML='<div class="p-8 text-center text-slate-500">3Dグラフライブラリの読み込みに失敗しました。</div>';return;}
+      if(!graphInstance){
+        graphInstance=ForceGraph3D()(container)
+          .backgroundColor('#0a0a0b')
+          .nodeLabel(n=>'<div style="background:#141416;border:1px solid #2a2a2e;padding:4px 8px;border-radius:6px;font-size:12px;color:#e2e8f0">'+escapeHtml(n.name)+'</div>')
+          .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeRelSize(5).nodeOpacity(0.9)
+          .linkColor(()=>'rgba(148,163,184,0.35)').linkOpacity(0.5).linkWidth(1.2)
+          .linkDirectionalParticles(2).linkDirectionalParticleWidth(1.5)
+          .onNodeClick(n=>openNoteById(n.id));
+        graphInstance.controls().autoRotate=false;
+      }
+      graphInstance.width(container.clientWidth).height(container.clientHeight);
+      buildGraphData().then(data=>graphInstance.graphData(data));}
+
+    const COMMANDS=[
+      {id:'new-note',label:'新規ノート作成',icon:'plus',run:()=>createNote()},
+      {id:'new-child',label:'サブページを追加',icon:'file-plus',run:()=>{if(state.currentNote)createChildNote(state.currentNote.id);}},
+      {id:'view-library',label:'ライブラリを開く',icon:'book-open',run:()=>setView('library')},
+      {id:'view-graph',label:'3Dグラフを開く',icon:'box',run:()=>setView('graph')},
+      {id:'toggle-ai',label:'AIパネルを開く／閉じる',icon:'sparkles',run:()=>toggleAiDrawer()},
+      {id:'toggle-preview',label:'プレビューを切り替え',icon:'eye',run:()=>setEditorMode(editorMode==='preview'?'edit':'preview')},
+      {id:'move',label:'ノートを移動',icon:'arrow-right-left',run:()=>openMoveModal()},
+      {id:'delete-note',label:'現在のノートを削除',icon:'trash-2',run:()=>{if(state.currentNote)deleteNote(state.currentNote.id);}},
+      {id:'export',label:'現在のノートを書き出す',icon:'download',run:()=>exportCurrentNote()},
+      {id:'notion-send',label:'Notionへ送信',icon:'arrow-up-from-line',run:()=>sendToNotion()},
+      {id:'notion-import',label:'Notionからインポート',icon:'arrow-down-to-line',run:()=>openNotionImportModal()},
+      {id:'suggest-links',label:'AIでつながりを提案',icon:'sparkles',run:()=>aiSuggestLinks()},
+      {id:'evaluate',label:'AIで充実度を評価',icon:'sparkles',run:()=>evaluateRichnessWithAI()},
+      {id:'settings',label:'設定を開く',icon:'settings',run:()=>openSettings()}
+    ];
+    let paletteIndex=0,paletteItems=[];
+    function openPalette(){document.getElementById('palette-overlay').classList.remove('hidden');
+      const inp=document.getElementById('palette-input');inp.value='';inp.focus();renderPalette('');}
+    function closePalette(){document.getElementById('palette-overlay').classList.add('hidden');}
+    async function renderPalette(q){q=q.toLowerCase();const items=[];
+      COMMANDS.forEach(c=>{if(!q||c.label.toLowerCase().includes(q))items.push(Object.assign({type:'cmd'},c));});
+      const notes=await TheGazeDB.getAllNotes();
+      notes.forEach(n=>{const t=n.title||'Untitled';
+        if(!q||t.toLowerCase().includes(q)||(n.content||'').toLowerCase().includes(q))items.push({type:'note',id:n.id,label:t,icon:'file-text'});});
+      paletteItems=items.slice(0,30);paletteIndex=0;drawPalette();}
+    function drawPalette(){const el=document.getElementById('palette-list');
+      if(paletteItems.length===0){el.innerHTML='<p class="text-xs text-slate-500 px-4 py-3">見つかりませんでした</p>';return;}
+      el.innerHTML=paletteItems.map((it,i)=>'<div class="palette-item '+(i===paletteIndex?'selected':'')+'" data-i="'+i+'">'
+        +'<i data-lucide="'+(it.icon||'file-text')+'" class="w-4 h-4 text-slate-500"></i>'
+        +'<span class="truncate">'+escapeHtml(it.label)+'</span>'
+        +'<span class="ml-auto text-[10px] text-slate-600">'+(it.type==='cmd'?'コマンド':'ノート')+'</span></div>').join('');
+      lucide.createIcons();
+      el.querySelectorAll('.palette-item').forEach(d=>{
+        d.addEventListener('click',()=>{paletteIndex=parseInt(d.dataset.i);executePalette();});
+        d.addEventListener('mousemove',()=>{const i=parseInt(d.dataset.i);if(paletteIndex!==i){paletteIndex=i;updatePaletteSel();}});});}
+    function updatePaletteSel(){document.querySelectorAll('.palette-item').forEach((d,i)=>d.classList.toggle('selected',i===paletteIndex));}
+    function executePalette(){const it=paletteItems[paletteIndex];if(!it)return;closePalette();
+      if(it.type==='cmd')it.run();else openNoteById(it.id);}
+
+    const DEFAULT_TEMPLATES=[
+      {id:'tpl_seed_1',name:'次のアクション分解',prompt:'このノートの内容に基づき、私が次に取るべき「具体的なアクション」を小さなステップに分解して列挙してください。'},
+      {id:'tpl_seed_2',name:'SWOT分析',prompt:'このノートに書かれているアイデア・テーマについて、SWOT分析（強み・弱み・機会・脅威）を行ってください。'},
+      {id:'tpl_seed_3',name:'構造化レビュー',prompt:'このノートの論理構成をレビューし、矛盾点・根拠の弱い箇所・抜け落ちている視点を指摘してください。'},
+      {id:'tpl_seed_4',name:'ファインマン理解',prompt:'このノートの内容を、初心者が理解できるように平易な言葉と具体例で説明し直し、私の理解が曖昧な部分を指摘してください。'},
+      {id:'tpl_seed_5',name:'反証の提示',prompt:'このノートの主張に対して、反対の立場から最も強力な反論・反例を3つ挙げてください。'}];
+    let editingTemplateId=null;
+    function getTemplates(){try{return JSON.parse(localStorage.getItem('gaze_prompt_templates')||'[]');}catch(e){return[];}}
+    function saveTemplates(arr){localStorage.setItem('gaze_prompt_templates',JSON.stringify(arr));}
+    function seedTemplates(){if(localStorage.getItem('gaze_prompt_templates')===null)saveTemplates(DEFAULT_TEMPLATES.slice());}
+    function renderTemplateList(){const listEl=document.getElementById('template-list');const tpls=getTemplates();
+      if(tpls.length===0){listEl.innerHTML='<p class="text-[11px] text-slate-600">カスタムプロンプトがありません。+ から作成。</p>';return;}
+      listEl.innerHTML=tpls.map(t=>'<div class="tpl-chip" data-id="'+t.id+'"><span class="flex items-center gap-1.5"><i data-lucide="play" class="w-3 h-3 text-blue-400"></i>'+escapeHtml(t.name)+'</span>'
+        +'<button class="tpl-edit" data-id="'+t.id+'" title="編集"><i data-lucide="pencil" class="w-3 h-3"></i></button></div>').join('');
+      lucide.createIcons();
+      listEl.querySelectorAll('.tpl-chip').forEach(chip=>{chip.addEventListener('click',(e)=>{if(e.target.closest('.tpl-edit'))return;
+        const tpl=getTemplates().find(x=>x.id===chip.dataset.id);if(tpl)runTemplate(tpl);});});
+      listEl.querySelectorAll('.tpl-edit').forEach(b=>b.addEventListener('click',(e)=>{e.stopPropagation();
+        const tpl=getTemplates().find(x=>x.id===b.dataset.id);if(tpl)openTemplateModal(tpl);}));}
+    function openTemplateModal(tpl){editingTemplateId=tpl?tpl.id:null;
+      document.getElementById('template-modal-title').textContent=tpl?'プロンプトテンプレートを編集':'新しいプロンプトテンプレート';
+      document.getElementById('template-name').value=tpl?tpl.name:'';
+      document.getElementById('template-prompt').value=tpl?tpl.prompt:'';
+      const del=document.getElementById('template-delete-btn');del.classList.toggle('hidden',!tpl);del.classList.toggle('flex',!!tpl);
+      document.getElementById('template-overlay').classList.remove('hidden');document.getElementById('template-name').focus();}
+    function closeTemplateModal(){document.getElementById('template-overlay').classList.add('hidden');}
+    function saveTemplate(){const name=document.getElementById('template-name').value.trim(),prompt=document.getElementById('template-prompt').value.trim();
+      if(!name){showToast('名前を入力してください','error');return;}
+      if(!prompt){showToast('プロンプトを入力してください','error');return;}
+      const tpls=getTemplates();
+      if(editingTemplateId){const i=tpls.findIndex(t=>t.id===editingTemplateId);if(i>=0)tpls[i]=Object.assign({},tpls[i],{name,prompt});}
+      else tpls.push({id:'tpl_'+Date.now()+'_'+Math.random().toString(36).substring(2,6),name,prompt});
+      saveTemplates(tpls);closeTemplateModal();renderTemplateList();showToast('テンプレートを保存しました','success');}
+    function deleteTemplate(){if(!editingTemplateId)return;if(!confirm('このテンプレートを削除しますか？'))return;
+      saveTemplates(getTemplates().filter(t=>t.id!==editingTemplateId));closeTemplateModal();renderTemplateList();showToast('テンプレートを削除しました','success');}
+    async function runTemplate(tpl){const provider=getSelectedProvider(),apiKey=getProviderApiKey(provider),settings=getSettings();
+      if(provider!=='ollama'&&!apiKey){showToast(getProviderName(provider)+'のAPIキーが設定されていません','error');openSettings();return;}
+      let prompt=tpl.prompt,context=state.currentNote?state.currentNote.content:'';
+      if(prompt.indexOf('{{note}}')>=0){prompt=prompt.split('{{note}}').join(context||'');context='';}
+      addChatMessage('user','['+tpl.name+']');const thinking=addChatMessage('assistant','',{isThinking:true,canAppend:false});
+      try{const resp=await askLLM({provider,apiKey,endpoint:settings.ollamaEndpoint,prompt,context:(context||'').substring(0,15000)});
+        thinking.remove();addChatMessage('assistant',resp);}
+      catch(err){thinking.remove();addChatMessage('assistant','**エラーが発生しました**\n\n'+err.message);}}
+
+    const GROWTH={weights:{links:0.35,chars:0.35,richness:0.30},caps:{links:30,chars:30000},thresholds:[0,8,20,40,62,85],
+      stageNames:{constellation:['闇夜の灯','一つ星','三つ星','星座の芽','星座','満天の星'],plant:['種','双葉','若葉','蕾','開花','満開'],campfire:['燻る薪','火種','小さな炎','炎','焚き火','篝火']},
+      hints:{constellation:'リンクで星を結ぼう',plant:'書くほど育つ',campfire:'言葉で火を育てよう'},
+      fillColors:{constellation:'linear-gradient(90deg,#3b82f6,#60a5fa)',plant:'linear-gradient(90deg,#22c55e,#4ade80)',campfire:'linear-gradient(90deg,#f97316,#fbbf24)'},
+      chipColors:{constellation:'bg-blue-500/15 text-blue-300',plant:'bg-green-500/15 text-green-300',campfire:'bg-orange-500/15 text-orange-300'}};
+    let lastGrowthLevel=null;
+    function getGrowthTheme(){return localStorage.getItem('gaze_growth_theme')||'constellation';}
+    function setGrowthTheme(t){localStorage.setItem('gaze_growth_theme',t);}
+    async function computeGrowthMetrics(){let notes=[];try{notes=await TheGazeDB.getAllNotes();}catch(e){}
+      let links=0,chars=0,richSum=0,richCount=0;
+      for(const n of notes){const c=n.content||'';chars+=c.length;const m=c.match(/\[\[[^\]]+\]\]/g);if(m)links+=m.length;
+        if(n.richness&&typeof n.richness.score==='number'){richSum+=n.richness.score;richCount++;}}
+      const avgRichness=richCount>0?richSum/richCount:0;
+      const score=GROWTH.weights.links*Math.min(links/GROWTH.caps.links,1)*100+GROWTH.weights.chars*Math.min(chars/GROWTH.caps.chars,1)*100+GROWTH.weights.richness*avgRichness;
+      const TH=GROWTH.thresholds;let level=0;for(let i=1;i<TH.length;i++)if(score>=TH[i])level=i;
+      let progress=level>=TH.length-1?1:(score-TH[level])/(TH[level+1]-TH[level]);
+      return{links,chars,avgRichness,richCount,score,level,progress:Math.max(0,Math.min(1,progress))};}
+    function renderGrowth(m){const theme=getGrowthTheme(),visualEl=document.getElementById('growth-visual');if(!visualEl)return;
+      visualEl.innerHTML=theme==='constellation'?renderConstellationSVG(m.level):theme==='plant'?renderPlantSVG(m.level):renderCampfireSVG(m.level);
+      document.getElementById('growth-stage').textContent=GROWTH.stageNames[theme][m.level];
+      const chip=document.getElementById('growth-level-chip');chip.textContent='Lv.'+m.level;chip.className='text-[10px] px-1.5 py-0.5 rounded-md font-semibold '+GROWTH.chipColors[theme];
+      const fill=document.getElementById('growth-progress-fill');fill.style.width=(m.progress*100)+'%';fill.style.background=GROWTH.fillColors[theme];
+      document.getElementById('metric-links').textContent='リンク '+m.links;
+      document.getElementById('metric-chars').textContent=formatCharCount(m.chars)+'字';
+      document.getElementById('metric-richness').textContent=m.richCount>0?'充実度 '+Math.round(m.avgRichness):'充実度 —';
+      document.querySelectorAll('#theme-selector .theme-btn').forEach(b=>b.classList.toggle('active',b.dataset.theme===theme));
+      const cEl=document.getElementById('growth-comment'),cn=state.currentNote;
+      cEl.textContent=(cn&&cn.richness&&cn.richness.comment)?'「'+cn.richness.comment+'」':GROWTH.hints[theme];}
+    async function refreshGrowth(){const m=await computeGrowthMetrics();renderGrowth(m);
+      if(lastGrowthLevel!==null&&m.level>lastGrowthLevel){showToast(GROWTH.stageNames[getGrowthTheme()][m.level]+' に成長しました','success');
+        const w=document.getElementById('growth-widget');if(w){w.classList.remove('level-up-flash');void w.offsetWidth;w.classList.add('level-up-flash');}}
+      lastGrowthLevel=m.level;}
+    function renderConstellationSVG(level){const stars=[{x:22,y:50},{x:38,y:30},{x:52,y:46},{x:66,y:24},{x:82,y:40},{x:50,y:12}];
+      const lines=[[0,1],[1,2],[2,3],[3,4],[2,5]];const nStars=Math.min(level+1,stars.length),nLines=Math.min(level,lines.length);
+      let s='<svg width="110" height="72" viewBox="0 0 100 64" fill="none">';
+      for(let i=0;i<nLines;i++){const a=stars[lines[i][0]],b=stars[lines[i][1]];s+='<line x1="'+a.x+'" y1="'+a.y+'" x2="'+b.x+'" y2="'+b.y+'" stroke="#60a5fa" stroke-width="0.6" opacity="0.35"/>';}
+      for(let i=0;i<nStars;i++){const st=stars[i],r=i===0?1.8:1.4;s+='<circle cx="'+st.x+'" cy="'+st.y+'" r="'+(r+2)+'" fill="#60a5fa" opacity="0.12"/><circle class="twinkle" style="animation-delay:'+(i*0.4)+'s" cx="'+st.x+'" cy="'+st.y+'" r="'+r+'" fill="#e2e8f0"/>';}
+      return s+'</svg>';}
+    function leaf(cx,cy,rot,color,rx){return'<ellipse cx="'+cx+'" cy="'+cy+'" rx="'+rx+'" ry="'+(rx*0.5)+'" fill="'+color+'" transform="rotate('+rot+' '+cx+' '+cy+')"/>';}
+    function flowerSVG(cx,cy,r,p,c){let f='';for(let i=0;i<6;i++){const a=i*60*Math.PI/180,px=cx+Math.cos(a)*r,py=cy+Math.sin(a)*r;f+='<ellipse cx="'+px+'" cy="'+py+'" rx="'+(r*0.7)+'" ry="'+(r*0.45)+'" fill="'+p+'" transform="rotate('+(i*60)+' '+px+' '+py+')" opacity="0.9"/>';}return f+'<circle cx="'+cx+'" cy="'+cy+'" r="'+(r*0.5)+'" fill="'+c+'"/>';}
+    function renderPlantSVG(level){let s='<svg width="80" height="80" viewBox="0 0 100 100" fill="none">';
+      if(level>=1){s+='<g class="plant-sway">';const top=[0,64,52,42,40,34][level];
+        s+='<path d="M50 74 Q49 '+((74+top)/2)+' 50 '+top+'" stroke="#4ade80" stroke-width="'+(1.5+level*0.3)+'" fill="none" stroke-linecap="round"/>';
+        if(level>=1){s+=leaf(46,64,-30,'#4ade80',4);s+=leaf(54,64,30,'#4ade80',4);}
+        if(level>=2){s+=leaf(44,58,-35,'#22c55e',5);s+=leaf(56,54,35,'#22c55e',5);}
+        if(level>=3){s+=leaf(45,48,-30,'#16a34a',4.5);}if(level>=4){s+=leaf(55,46,30,'#16a34a',4.5);}if(level>=5){s+=leaf(44,42,-32,'#15803d',5);}
+        if(level===3)s+='<circle cx="50" cy="40" r="3.2" fill="#a3e635"/>';
+        if(level===4)s+=flowerSVG(50,38,6,'#f472b6','#fbbf24');
+        if(level===5){s+=flowerSVG(50,32,7.5,'#f472b6','#fbbf24');s+=flowerSVG(39,44,4,'#a78bfa','#fbbf24');}
+        s+='</g>';}else{s+='<circle cx="50" cy="72" r="2.2" fill="#a16207"/>';}
+      s+='<ellipse cx="50" cy="74" rx="12" ry="2.5" fill="#5b4636"/><path d="M36 78 L64 78 L60 92 Q50 96 40 92 Z" fill="#3f3f46"/><rect x="33" y="73" width="34" height="6" rx="2" fill="#52525b"/></svg>';return s;}
+    function flamePath(cx,topY,baseY,w){const midY=topY+(baseY-topY)*0.45;return'M'+cx+' '+topY+' C '+(cx+w)+' '+midY+' '+(cx+w)+' '+(baseY-4)+' '+cx+' '+baseY+' C '+(cx-w)+' '+(baseY-4)+' '+(cx-w)+' '+midY+' '+cx+' '+topY+' Z';}
+    function renderCampfireSVG(level){let s='<svg width="80" height="80" viewBox="0 0 100 100" fill="none"><defs><radialGradient id="fg"><stop offset="0%" stop-color="#f97316" stop-opacity="0.35"/><stop offset="100%" stop-color="#f97316" stop-opacity="0"/></radialGradient></defs>';
+      const glowR=[0,12,18,24,30,36][level];
+      if(level>=1)s+='<circle class="fire-glow" cx="50" cy="58" r="'+glowR+'" fill="url(#fg)"/>';
+      if(level>=1){const fh=[0,12,20,30,38,48][level],topY=72-fh,w=Math.max(fh*0.32,4);
+        s+='<g class="flame-flicker">';s+='<path d="'+flamePath(50,topY,72,w)+'" fill="#f97316" opacity="0.92"/>';
+        if(level>=2){const ih=fh*0.55;s+='<path d="'+flamePath(50,72-ih,71,Math.max(ih*0.3,3))+'" fill="#fbbf24"/>';}
+        if(level>=4){const ch=fh*0.28;s+='<path d="'+flamePath(50,72-ch,70,Math.max(ch*0.3,2))+'" fill="#fde68a"/>';}s+='</g>';}
+      else{s+='<circle class="fire-glow" cx="50" cy="70" r="3" fill="#f97316"/>';}
+      if(level>=5){s+='<circle class="spark" cx="42" cy="52" r="1.2" fill="#fbbf24"/><circle class="spark" style="animation-delay:0.7s" cx="58" cy="48" r="1" fill="#f97316"/>';}
+      s+='<rect x="30" y="72" width="40" height="7" rx="3.5" fill="#7c5c3e" transform="rotate(8 50 76)"/><rect x="30" y="72" width="40" height="7" rx="3.5" fill="#6b4f35" transform="rotate(-8 50 76)"/></svg>';return s;}
+    function parseRichnessResponse(text){if(!text)return null;const m=text.match(/\{[\s\S]*?\}/);
+      if(m){try{const o=JSON.parse(m[0]);const sc=parseInt(o.score);if(!isNaN(sc))return{score:sc,comment:o.comment||''};}catch(e){}}
+      const sm=text.match(/"score"\s*:\s*"?(\d{1,3})/i)||text.match(/(\d{1,3})\s*点/);
+      if(sm){const cm=text.match(/"comment"\s*:\s*"([^"]*)"/i);return{score:parseInt(sm[1]),comment:cm?cm[1]:''};}return null;}
+    async function evaluateRichnessWithAI(){if(!state.currentNote){showToast('評価するノートを開いてください','error');return;}
+      const content=state.currentNote.content||'';
+      if(content.trim().length<20){showToast('まだ内容が短いようです','error');return;}
+      const provider=getSelectedProvider(),apiKey=getProviderApiKey(provider),settings=getSettings();
+      if(provider!=='ollama'&&!apiKey){showToast('AI評価にはAPIキーが必要です','error');openSettings();return;}
+      const prompt='あなたは思考ノートの「内容充実度」を静かに見守る鑑定士です。各25点・計100点（具体性・構造・発展性・問い）で評価してください。必ずJSON形式のみで: {"score": 0-100の整数, "comment": "20字以内の一言"}\n\nノート本文:\n'+content.substring(0,6000);
+      try{const resp=await askLLM({provider,apiKey,endpoint:settings.ollamaEndpoint,prompt,context:''});
+        const parsed=parseRichnessResponse(resp);if(!parsed)throw new Error('AIの応答を解析できませんでした');
+        const score=Math.max(0,Math.min(100,Math.round(parsed.score)));
+        state.currentNote.richness={score,comment:parsed.comment||'',at:Date.now()};
+        await TheGazeDB.addNote(state.currentNote);
+        showToast('充実度 '+score+'点 — '+(parsed.comment||'評価しました'),'success');
+        await renderTree();refreshGrowth();
+      }catch(err){showToast('AI評価に失敗: '+err.message,'error');console.error(err);}}
+
+    function richTextToMarkdown(rt){if(!rt||!Array.isArray(rt))return'';return rt.map(x=>{let t=x.plain_text||'';const a=x.annotations||{};
+      if(a.code)t='\u0060'+t+'\u0060';if(a.bold)t='**'+t+'**';if(a.italic)t='*'+t+'*';if(a.strikethrough)t='~~'+t+'~~';if(x.href)t='['+t+']('+x.href+')';return t;}).join('');}
+    async function notionBlocksToMarkdown(blocks,depth){depth=depth||0;if(!blocks||!Array.isArray(blocks))return'';let md='';const ind='  '.repeat(depth);
+      for(const b of blocks){const t=b.type,d=b[t];
+        if(t==='paragraph')md+=ind+richTextToMarkdown(d.rich_text)+'\n\n';
+        else if(t==='heading_1')md+=ind+'# '+richTextToMarkdown(d.rich_text)+'\n\n';
+        else if(t==='heading_2')md+=ind+'## '+richTextToMarkdown(d.rich_text)+'\n\n';
+        else if(t==='heading_3')md+=ind+'### '+richTextToMarkdown(d.rich_text)+'\n\n';
+        else if(t==='bulleted_list_item')md+=ind+'- '+richTextToMarkdown(d.rich_text)+'\n';
+        else if(t==='numbered_list_item')md+=ind+'1. '+richTextToMarkdown(d.rich_text)+'\n';
+        else if(t==='to_do')md+=ind+'- '+(d.checked?'[x] ':'[ ] ')+richTextToMarkdown(d.rich_text)+'\n';
+        else if(t==='quote')md+=ind+richTextToMarkdown(d.rich_text).split('\n').map(l=>'> '+l).join('\n')+'\n\n';
+        else if(t==='code')md+=ind+'\u0060\u0060\u0060'+(d.language||'')+'\n'+richTextToMarkdown(d.rich_text)+'\n'+ind+'\u0060\u0060\u0060\n\n';
+        else if(t==='divider')md+=ind+'---\n\n';
+        else if(d&&d.rich_text)md+=ind+richTextToMarkdown(d.rich_text)+'\n\n';
+        if(b.has_children&&b.children)md+=await notionBlocksToMarkdown(b.children,depth+1);}
+      return md;}
+    function markdownToNotionBlocks(md){if(!md||!md.trim())return[];const blocks=[],lines=md.split('\n');let i=0;
+      const F3='\u0060\u0060\u0060';
+      const pi=(text)=>{const rt=[],re=new RegExp('(\\*\\*(.+?)\\*\\*|\\*(.+?)\\*|\u0060(.+?)\u0060|([^*\u0060]+))','g');let m;
+        while((m=re.exec(text))!==null){if(m[2])rt.push({type:'text',text:{content:m[2]},annotations:{bold:true}});
+          else if(m[3])rt.push({type:'text',text:{content:m[3]},annotations:{italic:true}});
+          else if(m[4])rt.push({type:'text',text:{content:m[4]},annotations:{code:true}});
+          else if(m[5])rt.push({type:'text',text:{content:m[5]}});}
+        return rt.length?rt:[{type:'text',text:{content:text}}];};
+      while(i<lines.length){const l=lines[i];let m;
+        if((m=l.match(/^# (.+)$/))){blocks.push({object:'block',type:'heading_1',heading_1:{rich_text:pi(m[1])}});i++;continue;}
+        if((m=l.match(/^## (.+)$/))){blocks.push({object:'block',type:'heading_2',heading_2:{rich_text:pi(m[1])}});i++;continue;}
+        if((m=l.match(/^### (.+)$/))){blocks.push({object:'block',type:'heading_3',heading_3:{rich_text:pi(m[1])}});i++;continue;}
+        if((m=l.match(/^[-*] \[(x| )\] (.+)$/i))){blocks.push({object:'block',type:'to_do',to_do:{rich_text:pi(m[2]),checked:m[1].toLowerCase()==='x'}});i++;continue;}
+        if((m=l.match(/^[-*] (.+)$/))){blocks.push({object:'block',type:'bulleted_list_item',bulleted_list_item:{rich_text:pi(m[1])}});i++;continue;}
+        if((m=l.match(/^\d+\. (.+)$/))){blocks.push({object:'block',type:'numbered_list_item',numbered_list_item:{rich_text:pi(m[1])}});i++;continue;}
+        if((m=l.match(/^> (.+)$/))){blocks.push({object:'block',type:'quote',quote:{rich_text:pi(m[1])}});i++;continue;}
+        if(l.trim().indexOf(F3)===0){let code='';const lm=l.trim().match(new RegExp('^'+F3+'(\\w+)?'));const lang=(lm&&lm[1])||'plain text';i++;
+          while(i<lines.length&&lines[i].trim().indexOf(F3)!==0){code+=(code?'\n':'')+lines[i];i++;}i++;
+          blocks.push({object:'block',type:'code',code:{rich_text:[{type:'text',text:{content:code}}],language:lang}});continue;}
+        if(l.trim()==='---'){blocks.push({object:'block',type:'divider',divider:{}});i++;continue;}
+        if(l.trim()===''){i++;continue;}
+        blocks.push({object:'block',type:'paragraph',paragraph:{rich_text:pi(l)}});i++;}
+      return blocks;}
+    async function callNotionAPI(endpoint,options){options=options||{};const settings=getSettings();
+      if(!settings.notionToken)throw new Error('Notion Tokenが設定されていません');
+      const res=await fetch('https://api.notion.com'+endpoint,{method:options.method,headers:Object.assign({'Authorization':'Bearer '+settings.notionToken,'Notion-Version':'2022-06-28','Content-Type':'application/json'},options.headers),body:options.body});
+      if(!res.ok){const et=await res.text();let em='Notion API Error';try{em=JSON.parse(et).message||em;}catch(e){}throw new Error(res.status+': '+em);}
+      return res.json();}
+    async function fetchNotionPagesList(query){const body={filter:{or:[{property:'object',value:'page'},{property:'object',value:'database'}]},sort:{direction:'descending',timestamp:'last_edited_time'},page_size:100};if(query)body.query=query;
+      const r=await callNotionAPI('/v1/search',{method:'POST',body:JSON.stringify(body)});return r.results||[];}
+    async function fetchNotionPageBlocks(pageId){const all=[];async function fb(id){const r=await callNotionAPI('/v1/blocks/'+id+'/children?page_size=100');
+      for(const b of r.results){if(b.has_children){const cr=await callNotionAPI('/v1/blocks/'+b.id+'/children?page_size=100');b.children=cr.results||[];}all.push(b);}}
+      await fb(pageId);return all;}
+    function getPageTitle(p){if(!p)return'Untitled';const pr=p.properties||{};for(const k in pr){const x=pr[k];if(x.type==='title'&&x.title)return x.title.map(t=>t.plain_text).join('')||'Untitled';}return p.title||'Untitled';}
+    function getPageLastEdited(p){if(!p.last_edited_time)return'';return new Date(p.last_edited_time).toLocaleDateString('ja-JP',{month:'short',day:'numeric'});}
+    async function openNotionImportModal(q){const settings=getSettings();
+      if(!settings.notionToken){showToast('Notion設定でTokenを入力してください','error');openSettings();return;}
+      document.getElementById('notion-overlay').classList.remove('hidden');document.getElementById('notion-search-input').value=q||'';await loadNotionPages(q||'');}
+    function closeNotionModal(){document.getElementById('notion-overlay').classList.add('hidden');}
+    async function loadNotionPages(query){const c=document.getElementById('notion-pages-container');
+      c.innerHTML='<div class="text-center py-12 text-slate-500"><div class="thinking-dots inline-flex mb-3"><span></span><span></span><span></span></div><p class="text-sm">検索中...</p></div>';
+      try{const pages=await fetchNotionPagesList(query);
+        if(pages.length===0){c.innerHTML='<p class="text-center py-12 text-slate-500 text-sm">ページが見つかりませんでした</p>';return;}
+        c.innerHTML=pages.map(p=>'<div class="notion-page-item flex items-start gap-3" data-page-id="'+p.id+'"><div class="flex-1 min-w-0"><h3 class="font-semibold text-white text-sm truncate">'+escapeHtml(getPageTitle(p))+'</h3><p class="text-xs text-slate-500 mt-1">'+getPageLastEdited(p)+'</p></div><button class="import-notion-page-btn px-3 py-1.5 rounded-md text-xs btn-primary text-white flex-shrink-0">インポート</button></div>').join('');
+        c.querySelectorAll('.notion-page-item').forEach(item=>{item.querySelector('.import-notion-page-btn').addEventListener('click',async(e)=>{e.stopPropagation();await importNotionPage(item.dataset.pageId);});});
+      }catch(err){c.innerHTML='<p class="text-center py-12 text-red-400 text-sm">エラー: '+escapeHtml(err.message)+'</p>';}}
+    async function importNotionPage(pageId){const settings=getSettings();if(!settings.notionToken){showToast('Notion設定が完了していません','error');return;}
+      showToast('Notionから読み込み中...','success');
+      try{const page=await callNotionAPI('/v1/pages/'+pageId);const title=getPageTitle(page);
+        const blocks=await fetchNotionPageBlocks(pageId);const md=await notionBlocksToMarkdown(blocks);
+        const note={id:newId(),title:title||'Imported from Notion',content:md.trim(),parentId:null,createdAt:Date.now(),updatedAt:Date.now(),notionPageId:pageId};
+        await TheGazeDB.addNote(note);await renderTree();closeNotionModal();openNoteById(note.id);
+        showToast('「'+title+'」をインポートしました','success');refreshGrowth();
+      }catch(err){showToast('インポート失敗: '+err.message,'error');console.error(err);}}
+    async function sendToNotion(){if(!state.currentNote){showToast('ノートを開いてください','error');return;}
+      const settings=getSettings();if(!settings.notionToken||!settings.notionPageId){showToast('Notion設定が完了していません','error');openSettings();return;}
+      const title=state.currentNote.title||'Untitled';const blocks=markdownToNotionBlocks(state.currentNote.content||'');
+      showToast('Notionに送信中...','success');
+      try{const res=await fetch('https://api.notion.com/v1/pages',{method:'POST',
+        headers:{'Authorization':'Bearer '+settings.notionToken,'Notion-Version':'2022-06-28','Content-Type':'application/json'},
+        body:JSON.stringify({parent:{page_id:settings.notionPageId},properties:{title:[{text:{content:title}}]},children:blocks.length?blocks:[{object:'block',type:'paragraph',paragraph:{rich_text:[{type:'text',text:{content:'(空)'}}]}}]})});
+        if(!res.ok){const ed=await res.json().catch(()=>({}));throw new Error(ed.message||res.statusText);}
+        const result=await res.json();state.currentNote.notionPageId=result.id;await TheGazeDB.addNote(state.currentNote);await renderTree();
+        showToast('Notionに送信しました','success');if(result.url&&confirm('Notionで開きますか？'))window.open(result.url,'_blank');
+      }catch(err){showToast('Notion送信に失敗: '+err.message,'error');console.error(err);}}
+
+    function exportCurrentNote(){if(!state.currentNote){showToast('ノートを開いてください','error');return;}
+      const title=state.currentNote.title||'untitled';const md='# '+(state.currentNote.title||'Untitled')+'\n\n'+(state.currentNote.content||'');
+      const blob=new Blob([md],{type:'text/markdown'});const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=title.replace(/[^a-zA-Z0-9\u3000-\u9FFF]/g,'_')+'.md';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);showToast('Markdownを書き出しました','success');}
+    async function exportAllNotes(){try{const notes=await TheGazeDB.getAllNotes();if(notes.length===0){showToast('書き出すノートがありません','error');return;}
+      const blob=new Blob([JSON.stringify({version:2,exportedAt:Date.now(),notes},null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='the-gaze-backup-'+new Date().toISOString().slice(0,10)+'.json';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);showToast(notes.length+'件書き出しました','success');
+    }catch(e){showToast('書き出しに失敗しました','error');}}
+    async function importNotes(file){try{const text=await file.text();
+      if(file.name.endsWith('.json')){const data=JSON.parse(text);if(!data.notes||!Array.isArray(data.notes))throw new Error('無効なJSON');
+        let count=0;for(const n of data.notes){if(n.id&&(n.title||n.content)){await TheGazeDB.addNote(n);count++;}}
+        await renderNotesList();showToast(count+'件読み込みました','success');refreshGrowth();
+      }else if(file.name.endsWith('.md')){const content=text.replace(/^# .*\n\n?/,'');const tm=text.match(/^# (.*)$/m);
+        const note={id:newId(),title:tm?tm[1].trim():file.name.replace('.md',''),content,parentId:null,createdAt:Date.now(),updatedAt:Date.now()};
+        await TheGazeDB.addNote(note);await renderNotesList();openNoteById(note.id);showToast('Markdownを読み込みました','success');refreshGrowth();
+      }else throw new Error('対応していない形式です');
+    }catch(e){showToast('読み込み失敗: '+e.message,'error');}}
+    async function resetAllData(){if(!confirm('本当にすべてのデータを削除しますか？'))return;
+      if(!confirm('最終確認: 取り消せません。よろしいですか？'))return;
+      try{const db=await TheGazeDB.open();db.transaction(NOTES_STORE,'readwrite').objectStore(NOTES_STORE).clear();
+        localStorage.clear();state.currentNote=null;await renderNotesList();setView('library');
+        showToast('すべてのデータを削除しました','success');closeSettings();refreshGrowth();
+      }catch(e){showToast('削除に失敗しました','error');}}
+
+    async function askLLM(o){let full=o.prompt;
+      if(o.context&&o.context.trim())full='You are an AI assistant helping with note analysis.\n\n---\nNOTE CONTENT:\n'+o.context+'\n---\n\nUSER REQUEST:\n'+o.prompt+'\n\nRespond in Japanese.';
+      else full='You are a helpful AI assistant. Respond in Japanese.\n\nUSER REQUEST:\n'+o.prompt;
+      if(o.provider==='gemini')return callGemini(o.apiKey,full);
+      if(o.provider==='claude')return callClaude(o.apiKey,full);
+      if(o.provider==='openai')return callOpenAI(o.apiKey,full);
+      if(o.provider==='ollama')return callOllama(o.endpoint,full,o.model);
+      throw new Error('不明なプロバイダー');}
+    async function callGemini(apiKey,prompt){if(!apiKey)throw new Error('Gemini APIキー未設定');
+      const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key='+apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.7,maxOutputTokens:4096}})});
+      if(!r.ok){const et=await r.text();let em='Gemini API Error';try{em=JSON.parse(et).error&&JSON.parse(et).error.message||em;}catch(e){}throw new Error(em);}
+      const d=await r.json();const t=d.candidates&&d.candidates[0]&&d.candidates[0].content&&d.candidates[0].content.parts&&d.candidates[0].content.parts[0]&&d.candidates[0].content.parts[0].text;if(!t)throw new Error('応答なし');return t;}
+    async function callClaude(apiKey,prompt){if(!apiKey)throw new Error('Claude APIキー未設定');
+      const r=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-3-5-sonnet-20241022',max_tokens:4096,messages:[{role:'user',content:prompt}]})});
+      if(!r.ok){const et=await r.text();let em='Claude API Error';try{em=JSON.parse(et).error&&JSON.parse(et).error.message||em;}catch(e){}throw new Error(em);}
+      const d=await r.json();const t=d.content&&d.content[0]&&d.content[0].text;if(!t)throw new Error('応答なし');return t;}
+    async function callOpenAI(apiKey,prompt){if(!apiKey)throw new Error('OpenAI APIキー未設定');
+      const r=await fetch('https://api.openai.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+apiKey},body:JSON.stringify({model:'gpt-4o',messages:[{role:'user',content:prompt}],max_tokens:4096,temperature:0.7})});
+      if(!r.ok){const et=await r.text();let em='OpenAI API Error';try{em=JSON.parse(et).error&&JSON.parse(et).error.message||em;}catch(e){}throw new Error(em);}
+      const d=await r.json();const t=d.choices&&d.choices[0]&&d.choices[0].message&&d.choices[0].message.content;if(!t)throw new Error('応答なし');return t;}
+    async function callOllama(endpoint,prompt,model){const ep=(endpoint||'http://localhost:11434').replace(/\/+$/,'');
+      const r=await fetch(ep+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:model||'llama3',prompt,stream:false,options:{temperature:0.7,num_predict:4096}})});
+      if(!r.ok)throw new Error('Ollama Error');const d=await r.json();if(!d.response)throw new Error('応答なし');return d.response;}
+
+    function addChatMessage(role,content,options){options=options||{};const c=document.getElementById('chat-container');
+      const div=document.createElement('div');div.className='chat-message rounded-xl p-4 '+(role==='user'?'bg-white/5 border border-gaze-border ml-4':'bg-gradient-to-br from-blue-900/20 to-indigo-900/10 border border-blue-700/30 mr-4');
+      const h=document.createElement('div');h.className='flex items-center gap-2 mb-2';
+      h.innerHTML=role==='user'?'<span class="text-xs font-semibold text-slate-300">You</span>':'<span class="text-xs font-semibold text-blue-300">AI Assistant</span>';
+      const body=document.createElement('div');
+      if(options.isThinking)body.innerHTML='<div class="flex items-center gap-3 text-slate-400"><div class="thinking-dots"><span></span><span></span><span></span></div><span class="text-sm">思考中...</span></div>';
+      else if(role==='assistant'){body.className='prose prose-sm prose-invert max-w-none text-slate-200';try{body.innerHTML=marked.parse(content||'');}catch(e){body.textContent=content||'';}}
+      else{body.className='text-sm text-slate-200 whitespace-pre-wrap';body.textContent=content||'';}
+      div.appendChild(h);div.appendChild(body);
+      if(role==='assistant'&&!options.isThinking&&options.canAppend!==false){
+        const act=document.createElement('div');act.className='mt-3 pt-3 border-t border-blue-700/20 flex gap-2';
+        act.innerHTML='<button class="append-to-note-btn flex items-center gap-1.5 text-xs bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-1.5 rounded-md transition-all"><i data-lucide="file-plus" class="w-3 h-3"></i>追記</button><button class="copy-btn flex items-center gap-1.5 text-xs bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-1.5 rounded-md transition-all"><i data-lucide="copy" class="w-3 h-3"></i>コピー</button>';
+        div.appendChild(act);
+        act.querySelector('.append-to-note-btn').addEventListener('click',()=>{const ta=document.getElementById('note-content');const sep=ta.value.trim()?'\n\n---\n\n':'';ta.value=ta.value+sep+content;ta.dispatchEvent(new Event('input'));scheduleSave();showToast('ノートに追記しました','success');});
+        act.querySelector('.copy-btn').addEventListener('click',()=>navigator.clipboard.writeText(content).then(()=>showToast('コピーしました','success')));}
+      c.appendChild(div);c.scrollTop=c.scrollHeight;lucide.createIcons();return div;}
+    function getSelectedProvider(){return document.getElementById('model-select').value;}
+    function getProviderApiKey(p){const s=getSettings();if(p==='gemini')return s.geminiKey;if(p==='claude')return s.claudeKey;if(p==='openai')return s.openaiKey;return null;}
+    function getProviderName(p){return{gemini:'Google Gemini',claude:'Anthropic Claude',openai:'OpenAI',ollama:'Ollama'}[p]||p;}
+    function toggleAiDrawer(){const d=document.getElementById('ai-drawer');const willShow=d.classList.contains('hidden');
+      d.classList.toggle('hidden',!willShow);d.classList.toggle('flex',willShow);}
+    async function sendChatMessage(){const input=document.getElementById('chat-input');const msg=input.value.trim();if(!msg)return;
+      const provider=getSelectedProvider(),apiKey=getProviderApiKey(provider),settings=getSettings();
+      if(provider!=='ollama'&&!apiKey){showToast(getProviderName(provider)+'のAPIキーが設定されていません','error');openSettings();return;}
+      addChatMessage('user',msg);input.value='';
+      const context=state.currentNote?state.currentNote.content:'';const thinking=addChatMessage('assistant','',{isThinking:true,canAppend:false});
+      try{const r=await askLLM({provider,apiKey,endpoint:settings.ollamaEndpoint,prompt:msg,context:(context||'').substring(0,15000)});thinking.remove();addChatMessage('assistant',r);}
+      catch(err){thinking.remove();addChatMessage('assistant','**エラーが発生しました**\n\n'+err.message);}}
+    async function handleAIAction(action){const provider=getSelectedProvider(),apiKey=getProviderApiKey(provider),settings=getSettings();
+      if(!state.currentNote||!(state.currentNote.content||'').trim()){showToast('ノートに内容がありません','error');return;}
+      if(provider!=='ollama'&&!apiKey){showToast(getProviderName(provider)+'のAPIキーが設定されていません','error');openSettings();return;}
+      const prompts={summarize:'このノートを簡潔に要約し、主要ポイントを箇条書きで抽出してください。',
+        ideas:'このノートに基づき、関連する新しいアイデア・拡張可能性・別の視点を5つ提案してください。',
+        questions:'このノートについて、深掘りすべき疑問点・検討すべき課題を5つ抽出してください。'};
+      const names={summarize:'ノートの要約',ideas:'関連アイデアの提案',questions:'疑問点の抽出'};
+      addChatMessage('user','['+names[action]+']');const thinking=addChatMessage('assistant','',{isThinking:true,canAppend:false});
+      try{const r=await askLLM({provider,apiKey,endpoint:settings.ollamaEndpoint,prompt:prompts[action],context:state.currentNote.content.substring(0,15000)});thinking.remove();addChatMessage('assistant',r);}
+      catch(err){thinking.remove();addChatMessage('assistant','**エラーが発生しました**\n\n'+err.message);}}
+
+    function getSettings(){return{geminiKey:localStorage.getItem('gaze_gemini_key')||'',claudeKey:localStorage.getItem('gaze_claude_key')||'',
+      openaiKey:localStorage.getItem('gaze_openai_key')||'',ollamaEndpoint:localStorage.getItem('gaze_ollama_endpoint')||'http://localhost:11434',
+      notionToken:localStorage.getItem('gaze_notion_token')||'',notionPageId:localStorage.getItem('gaze_notion_page_id')||''};}
+    function saveSettingsToStorage(){const set=(k,v)=>{v=v.trim();if(v)localStorage.setItem(k,v);else localStorage.removeItem(k);};
+      set('gaze_gemini_key',document.getElementById('gemini-key').value);set('gaze_claude_key',document.getElementById('claude-key').value);
+      set('gaze_openai_key',document.getElementById('openai-key').value);
+      localStorage.setItem('gaze_ollama_endpoint',document.getElementById('ollama-endpoint').value.trim()||'http://localhost:11434');
+      set('gaze_notion_token',document.getElementById('notion-token').value);set('gaze_notion_page_id',document.getElementById('notion-page-id').value);
+      showToast('設定を保存しました','success');}
+    function loadSettingsToForm(){const s=getSettings();document.getElementById('gemini-key').value=s.geminiKey;document.getElementById('claude-key').value=s.claudeKey;
+      document.getElementById('openai-key').value=s.openaiKey;document.getElementById('ollama-endpoint').value=s.ollamaEndpoint;
+      document.getElementById('notion-token').value=s.notionToken;document.getElementById('notion-page-id').value=s.notionPageId;}
+    function openSettings(){document.getElementById('settings-overlay').classList.remove('hidden');loadSettingsToForm();}
+    function closeSettings(){document.getElementById('settings-overlay').classList.add('hidden');}
+    function setupTabs(){document.querySelectorAll('.tab-button').forEach(btn=>btn.addEventListener('click',()=>{const t=btn.dataset.tab;
+      document.querySelectorAll('.tab-button').forEach(b=>{b.classList.remove('active');b.classList.add('text-slate-500');b.classList.remove('text-slate-300');});
+      btn.classList.add('active');btn.classList.remove('text-slate-500');btn.classList.add('text-slate-300');
+      document.querySelectorAll('.tab-content').forEach(c=>c.classList.add('hidden'));const el=document.getElementById('tab-'+t);if(el)el.classList.remove('hidden');}));}
+
+    function setupEventListeners(){
+      document.querySelectorAll('.activity-btn[data-view]').forEach(b=>b.addEventListener('click',()=>setView(b.dataset.view)));
+      document.getElementById('open-command-btn').addEventListener('click',openPalette);
+      document.getElementById('open-settings-btn').addEventListener('click',openSettings);
+      document.getElementById('lib-new-note').addEventListener('click',createNote);
+      document.getElementById('dash-new-note').addEventListener('click',createNote);
+      document.getElementById('dash-open-graph').addEventListener('click',()=>setView('graph'));
+      document.getElementById('lib-search').addEventListener('input',e=>{state.searchQuery=e.target.value;renderTree();});
+      document.getElementById('back-to-library').addEventListener('click',()=>setView('library'));
+      document.getElementById('move-note-btn').addEventListener('click',openMoveModal);
+      document.getElementById('move-cancel').addEventListener('click',()=>document.getElementById('move-overlay').classList.add('hidden'));
+      document.getElementById('toggle-ai-btn').addEventListener('click',toggleAiDrawer);
+      document.getElementById('close-ai-btn').addEventListener('click',toggleAiDrawer);
+      document.getElementById('add-child-btn').addEventListener('click',()=>{if(state.currentNote)createChildNote(state.currentNote.id);});
+      document.getElementById('pin-current-btn').addEventListener('click',()=>{if(state.currentNote)togglePin(state.currentNote.id);});
+      document.getElementById('graph-reset').addEventListener('click',()=>{if(graphInstance)graphInstance.zoomToFit(400);});
+      document.getElementById('graph-rotate').addEventListener('click',function(){if(!graphInstance)return;
+        const c=graphInstance.controls();c.autoRotate=!c.autoRotate;this.classList.toggle('active',c.autoRotate);});
+      const pInput=document.getElementById('palette-input');
+      pInput.addEventListener('input',()=>renderPalette(pInput.value));
+      pInput.addEventListener('keydown',e=>{
+        if(e.key==='ArrowDown'){e.preventDefault();paletteIndex=Math.min(paletteIndex+1,paletteItems.length-1);updatePaletteSel();}
+        else if(e.key==='ArrowUp'){e.preventDefault();paletteIndex=Math.max(paletteIndex-1,0);updatePaletteSel();}
+        else if(e.key==='Enter'){e.preventDefault();executePalette();}
+        else if(e.key==='Escape'){closePalette();}});
+      document.getElementById('palette-overlay').addEventListener('click',e=>{if(e.target.id==='palette-overlay')closePalette();});
+      document.getElementById('note-title').addEventListener('input',()=>{scheduleSave();updateStats();});
+      const contentEl=document.getElementById('note-content');
+      contentEl.addEventListener('input',e=>{scheduleSave();handleEditorInput(e);});
+      contentEl.addEventListener('blur',()=>setTimeout(hideWikilinkModal,200));
+      contentEl.addEventListener('keydown',e=>{
+        if(e.key==='Escape')hideWikilinkModal();
+        if(e.key==='Tab'){e.preventDefault();const s=contentEl.selectionStart,en=contentEl.selectionEnd;contentEl.setRangeText('  ',s,en,'end');contentEl.selectionStart=contentEl.selectionEnd=s+2;scheduleSave();return;}
+        const mod=e.ctrlKey||e.metaKey;
+        if(mod&&e.key==='b'){e.preventDefault();applyMd('bold');}
+        if(mod&&e.key==='i'){e.preventDefault();applyMd('italic');}
+        if(mod&&e.key==='k'){e.preventDefault();applyMd('link');}});
+      contentEl.addEventListener('click',e=>{if(!(e.ctrlKey||e.metaKey))return;
+        const pos=contentEl.selectionStart,val=contentEl.value;const before=val.lastIndexOf('[[',pos);if(before===-1)return;
+        const close=val.indexOf(']]',before);if(close===-1||pos>close+2)return;
+        const name=val.substring(before+2,close);if(name)openNoteByTitle(name);});
+      document.querySelectorAll('[data-md]').forEach(b=>b.addEventListener('click',()=>applyMd(b.dataset.md)));
+      document.querySelectorAll('.mode-btn').forEach(b=>b.addEventListener('click',()=>setEditorMode(b.dataset.mode)));
+      document.getElementById('outline-btn').addEventListener('click',e=>{e.stopPropagation();toggleOutlineMenu();});
+      document.addEventListener('click',e=>{const wrap=document.getElementById('outline-wrap');const menu=document.getElementById('outline-menu');
+        if(wrap&&menu&&!wrap.contains(e.target))menu.classList.add('hidden');});
+      document.getElementById('backlinks-toggle').addEventListener('click',()=>{state.backlinksOpen=!state.backlinksOpen;
+        document.getElementById('backlinks-list').classList.toggle('hidden',!state.backlinksOpen);
+        document.getElementById('backlinks-chevron').style.transform=state.backlinksOpen?'rotate(180deg)':'rotate(0deg)';});
+      document.getElementById('ai-suggest-links-btn').addEventListener('click',aiSuggestLinks);
+      document.querySelectorAll('#theme-selector .theme-btn').forEach(b=>b.addEventListener('click',()=>{setGrowthTheme(b.dataset.theme);refreshGrowth();}));
+      document.getElementById('chat-send-btn').addEventListener('click',sendChatMessage);
+      document.getElementById('chat-input').addEventListener('keypress',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChatMessage();}});
+      document.querySelectorAll('.ai-action-btn').forEach(b=>b.addEventListener('click',()=>handleAIAction(b.dataset.action)));
+      document.getElementById('add-template-btn').addEventListener('click',()=>openTemplateModal());
+      document.getElementById('template-close-btn').addEventListener('click',closeTemplateModal);
+      document.getElementById('template-cancel-btn').addEventListener('click',closeTemplateModal);
+      document.getElementById('template-save-btn').addEventListener('click',saveTemplate);
+      document.getElementById('template-delete-btn').addEventListener('click',deleteTemplate);
+      document.getElementById('template-overlay').addEventListener('click',e=>{if(e.target.id==='template-overlay')closeTemplateModal();});
+      document.getElementById('send-to-notion-btn').addEventListener('click',sendToNotion);
+      document.getElementById('import-from-notion-btn').addEventListener('click',()=>openNotionImportModal());
+      document.getElementById('notion-close-btn').addEventListener('click',closeNotionModal);
+      document.getElementById('notion-overlay').addEventListener('click',e=>{if(e.target.id==='notion-overlay')closeNotionModal();});
+      document.getElementById('notion-search-input').addEventListener('keypress',e=>{if(e.key==='Enter')loadNotionPages(e.target.value.trim());});
+      document.getElementById('notion-refresh-btn').addEventListener('click',()=>loadNotionPages(document.getElementById('notion-search-input').value.trim()));
+      document.getElementById('settings-close-btn').addEventListener('click',closeSettings);
+      document.getElementById('settings-cancel-btn').addEventListener('click',closeSettings);
+      document.getElementById('settings-save-btn').addEventListener('click',()=>{saveSettingsToStorage();closeSettings();});
+      document.getElementById('settings-overlay').addEventListener('click',e=>{if(e.target.id==='settings-overlay')closeSettings();});
+      setupTabs();
+      document.getElementById('export-all-btn').addEventListener('click',exportAllNotes);
+      document.getElementById('import-data-btn').addEventListener('click',()=>document.getElementById('import-file-input').click());
+      document.getElementById('import-file-input').addEventListener('change',e=>{const f=e.target.files&&e.target.files[0];if(f){importNotes(f);e.target.value='';}});
+      document.getElementById('reset-all-btn').addEventListener('click',resetAllData);
+      document.addEventListener('keydown',e=>{
+        const mod=e.ctrlKey||e.metaKey;
+        if(mod&&e.key==='k'){e.preventDefault();openPalette();}
+        if(mod&&e.key==='j'){e.preventDefault();if(currentView==='editor')toggleAiDrawer();}
+        if(mod&&e.key==='n'){e.preventDefault();createNote();}
+        if(mod&&e.key===','){e.preventDefault();openSettings();}});
+    }
+    function configureMarked(){if(typeof marked!=='undefined')marked.setOptions({breaks:true,gfm:true,headerIds:false,mangle:false});}
+
+    async function init(){
+      configureMarked();setupEventListeners();lucide.createIcons();
+      seedTemplates();renderTemplateList();
+      setView('library');
+      try{const notes=await TheGazeDB.getAllNotes();if(notes.length>0){await loadNote(notes[0].id);}}catch(e){console.error(e);}
+      await renderNotesList();refreshGrowth();
+      const s=getSettings();
+      if(!s.geminiKey&&!s.claudeKey&&!s.openaiKey&&!s.notionToken)setTimeout(()=>showToast('設定からAPIキーを入力してください','success'),1500);
+    }
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+  </script>
+</body>
+</html>
