@@ -75,6 +75,10 @@
     .tree-node:hover .tree-add-child{opacity:1;}
     .tree-add-child:hover{color:#e2e8f0;background:rgba(255,255,255,.08);}
     .crumb{font-size:12px;transition:color .1s;white-space:nowrap;}
+    .subpage-row{display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:7px 10px;border-radius:8px;transition:background .12s;color:#e2e8f0;}
+    .subpage-row:hover{background:rgba(255,255,255,.05);}
+    .subpage-title{font-size:14px;text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(148,163,184,.45);}
+
     .subpage-card{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #2a2a2e;border-radius:8px;transition:all .12s;background:rgba(255,255,255,.02);min-width:0;}
     .subpage-card:hover{border-color:#475569;background:rgba(255,255,255,.05);}
     .recent-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;transition:background .12s;width:100%;}
@@ -250,10 +254,18 @@
             </div>
           </div>
           <div id="editor-area" class="flex-1 overflow-hidden flex min-h-0">
-            <div id="edit-pane" class="flex-1 overflow-y-auto min-w-0"><div class="max-w-3xl mx-auto p-8">
+          <div id="edit-pane" class="flex-1 overflow-y-auto min-w-0"><div class="max-w-3xl mx-auto p-8">
+              <textarea id="note-content" placeholder="Markdownで思考を整理する。[[ でWikiLink補完、#でタグ。" class="textarea-editor w-full min-h-[55vh] bg-transparent border-none outline-none resize-none text-slate-200 placeholder-slate-600 leading-relaxed"></textarea>
+              <div id="inline-subpages" class="mt-8"></div>
+            </div></div>
+
               <textarea id="note-content" placeholder="Markdownで思考を整理する。[[ でWikiLink補完、#でタグ。" class="textarea-editor w-full min-h-[55vh] bg-transparent border-none outline-none resize-none text-slate-200 placeholder-slate-600 leading-relaxed"></textarea>
             </div></div>
-            <div id="preview-pane" class="flex-1 overflow-y-auto min-w-0 hidden border-l border-gaze-border"><div id="preview-content" class="prose prose-invert max-w-3xl mx-auto p-8 text-slate-200"></div></div>
+            <div id="preview-pane" class="flex-1 overflow-y-auto min-w-0 hidden border-l border-gaze-border"><div class="max-w-3xl mx-auto p-8">
+              <div id="preview-content" class="prose prose-invert text-slate-200"></div>
+              <div id="inline-subpages-preview" class="mt-8"></div>
+            </div></div>
+
             <div id="wikilink-modal" class="hidden fixed z-50 bg-gaze-surface border border-gaze-border rounded-xl shadow-2xl w-72 max-h-64 overflow-y-auto fade-in"><div id="wikilink-suggestions"></div></div>
           </div>
           <div id="backlinks-panel" class="hidden border-t border-gaze-border bg-gaze-surface/20">
@@ -271,8 +283,12 @@
             <div id="related-local" class="px-6 pb-2 flex flex-wrap gap-1.5"></div>
             <div id="related-ai" class="px-6 pb-3 space-y-1.5"></div>
           </div>
-          <div id="subpages-wrap" class="hidden border-t border-gaze-border bg-gaze-surface/20 px-6 py-3">
+            <div id="subpages-wrap" class="hidden border-t border-gaze-border bg-gaze-surface/20 px-6 py-3">
             <p class="text-xs text-slate-400 font-medium mb-2 flex items-center gap-1.5"><i data-lucide="files" class="w-3.5 h-3.5"></i>サブページ</p>
+            <div id="subpages" class="flex flex-wrap gap-2"></div>
+          </div>
+
+				<i data-lucide="files" class="w-3.5 h-3.5"></i>サブページ</p>
             <div id="subpages" class="flex flex-wrap gap-2"></div>
           </div>
           <div class="px-6 py-1.5 border-t border-gaze-border flex items-center gap-4 text-[11px] text-slate-500 bg-gaze-surface/30">
@@ -604,16 +620,21 @@
         +'<button class="crumb truncate '+(n.id===state.currentNote.id?'text-slate-200':'text-slate-500 hover:text-slate-300')+'" data-id="'+n.id+'">'+escapeHtml(n.title||'Untitled')+'</button></span>').join('');
       lucide.createIcons();
       bc.querySelectorAll('.crumb').forEach(b=>b.addEventListener('click',()=>openNoteById(b.dataset.id)));}
-    async function renderSubpages(){const wrap=document.getElementById('subpages-wrap'),el=document.getElementById('subpages');
-      if(!state.currentNote){wrap.classList.add('hidden');return;}
+        async function renderSubpages(){
+      const editEl=document.getElementById('inline-subpages');
+      const prevEl=document.getElementById('inline-subpages-preview');
+      if(!state.currentNote){if(editEl)editEl.innerHTML='';if(prevEl)prevEl.innerHTML='';return;}
       const notes=await TheGazeDB.getAllNotes();
-      const kids=notes.filter(n=>n.parentId===state.currentNote.id).sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
-      if(kids.length===0){wrap.classList.add('hidden');return;}
-      wrap.classList.remove('hidden');
-      el.innerHTML=kids.map(k=>'<button class="subpage-card" data-id="'+k.id+'"><i data-lucide="file-text" class="w-3.5 h-3.5 text-slate-500 flex-shrink-0"></i><span class="truncate text-xs text-slate-300">'+escapeHtml(k.title||'Untitled')+'</span></button>').join('');
-      lucide.createIcons();
-      el.querySelectorAll('.subpage-card').forEach(b=>b.addEventListener('click',()=>openNoteById(b.dataset.id)));}
-
+      const kids=notes.filter(n=>n.parentId===state.currentNote.id).sort((a,b)=>(a.title||'').localeCompare(b.title||'','ja'));
+      let html='<div class="pt-5 mt-2 border-t border-gaze-border/60">';
+      if(kids.length)html+='<p class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2" style="letter-spacing:.06em;">Subpages</p>';
+      html+=kids.map(k=>'<button class="subpage-row" data-id="'+k.id+'"><i data-lucide="file-text" class="w-4 h-4 text-slate-500 flex-shrink-0"></i><span class="subpage-title">'+escapeHtml(k.title||'Untitled')+'</span><i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-600 ml-auto flex-shrink-0"></i></button>').join('');
+      html+='<button class="subpage-row subpage-add"><i data-lucide="plus" class="w-4 h-4 text-slate-500 flex-shrink-0"></i><span class="text-sm text-slate-500">新規ページ</span></button>';
+      html+='</div>';
+      [editEl,prevEl].forEach(el=>{if(!el)return;el.innerHTML=html;lucide.createIcons();
+        el.querySelectorAll('.subpage-row[data-id]').forEach(b=>b.addEventListener('click',()=>openNoteById(b.dataset.id)));
+        el.querySelectorAll('.subpage-add').forEach(b=>b.addEventListener('click',()=>createChildNote(state.currentNote.id)));});
+    }
     function openMoveModal(){if(!state.currentNote){showToast('ノートを開いてください','error');return;}buildMoveList();document.getElementById('move-overlay').classList.remove('hidden');}
     async function buildMoveList(){const notes=await TheGazeDB.getAllNotes();const cur=state.currentNote;
       const exclude=new Set([cur.id]);let changed=true;
