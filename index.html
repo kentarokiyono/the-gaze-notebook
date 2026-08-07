@@ -15,6 +15,7 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://unpkg.com/3d-force-graph/dist/3d-force-graph.min.js"></script>
+  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
 
   <script>
     tailwind.config={darkMode:'class',theme:{extend:{colors:{
@@ -344,6 +345,7 @@
         <div class="absolute top-4 right-4 flex flex-col gap-2">
           <button id="graph-reset" class="icon-btn bg-gaze-surface border border-gaze-border" title="視点リセット"><i data-lucide="maximize" class="w-4 h-4"></i></button>
           <button id="graph-rotate" class="icon-btn bg-gaze-surface border border-gaze-border" title="自動回転"><i data-lucide="refresh-cw" class="w-4 h-4"></i></button>
+          <button id="graph-related" class="icon-btn bg-gaze-surface border border-gaze-border" title="関連ラインを表示"><i data-lucide="link-2" class="w-4 h-4"></i></button>
         </div>
       </section>
 
@@ -786,18 +788,38 @@
         renderAiSuggestions();if(state.aiSuggestions.length===0)showToast('AIは意味のあるつながりを見つけられませんでした','success');
       }catch(err){showToast('AI提案に失敗: '+err.message,'error');console.error(err);}
       finally{btn.disabled=false;btn.innerHTML=orig;lucide.createIcons();}}
-
     let graphInstance=null;
+    let showRelated=false;
     function hashHue(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return Math.abs(h)%360;}
     function nodeColor(n){if(n.pinned)return'#60a5fa';const tags=extractTags((n.title||'')+' '+(n.content||''));
       if(tags.length)return'hsl('+hashHue(tags[0].toLowerCase())+',60%,60%)';return'#64748b';}
-    async function buildGraphData(){const notes=await TheGazeDB.getAllNotes();
+    function textSprite(text){if(typeof THREE==='undefined')return null;
+      const canvas=document.createElement('canvas');let ctx=canvas.getContext('2d');
+      const font='600 28px -apple-system, "Helvetica Neue", Arial, sans-serif';
+      ctx.font=font;let t=text||'';if(t.length>16)t=t.substring(0,15)+'…';
+      const w=Math.ceil(ctx.measureText(t).width)+20;canvas.width=w;canvas.height=44;
+      ctx=canvas.getContext('2d');ctx.font=font;ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.shadowColor='rgba(0,0,0,0.85)';ctx.shadowBlur=6;ctx.fillStyle='rgba(235,240,250,0.95)';
+      ctx.fillText(t,w/2,22);
+      const tex=new THREE.CanvasTexture(canvas);tex.minFilter=THREE.LinearFilter;
+      const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
+      sp.scale.set(w/16,44/16,1);return sp;}
+    function makeNodeObject(node){const group=new THREE.Group();
+      const r=2+Math.cbrt(node.val)*1.6;
+      group.add(new THREE.Mesh(new THREE.SphereGeometry(r,20,20),new THREE.MeshBasicMaterial({color:node.color,transparent:true,opacity:0.92})));
+      const label=textSprite(node.name);if(label){label.position.set(0,-(r+5),0);group.add(label);}
+      return group;}
+    async function buildGraphData(includeRelated){const notes=await TheGazeDB.getAllNotes();
       const titleMap={};notes.forEach(n=>{if(n.title)titleMap[n.title.toLowerCase()]=n.id;});
       const nodes=notes.map(n=>({id:n.id,name:n.title||'Untitled',val:Math.min(18,2+((n.content||'').length/300)),color:nodeColor(n)}));
       const links=[],seen=new Set();
       notes.forEach(n=>{const matches=(n.content||'').match(/\[\[([^\]]+)\]\]/g)||[];
         matches.forEach(m=>{const t=m.slice(2,-2).trim().toLowerCase();const target=titleMap[t];
-          if(target&&target!==n.id){const key=[n.id,target].sort().join('|');if(!seen.has(key)){seen.add(key);links.push({source:n.id,target});}}});});
+          if(target&&target!==n.id){const key=[n.id,target].sort().join('|');if(!seen.has(key)){seen.add(key);links.push({source:n.id,target:target,type:'link',color:'rgba(148,163,184,0.5)'});}}});});
+      if(includeRelated){for(const n of notes){
+        const rel=computeRelated(n,notes).filter(r=>r.weight>=5&&r.overlap>=0.12).slice(0,3);
+        for(const r of rel){const key=[n.id,r.note.id].sort().join('|');
+          if(!seen.has(key)){seen.add(key);links.push({source:n.id,target:r.note.id,type:'related',color:'rgba(167,139,250,0.5)'});}}}}
       return{nodes,links};}
     function initGraph(){const container=document.getElementById('graph-3d');if(!container)return;
       if(typeof ForceGraph3D==='undefined'){container.innerHTML='<div class="p-8 text-center text-slate-500">3Dグラフライブラリの読み込みに失敗しました。</div>';return;}
@@ -805,14 +827,19 @@
         graphInstance=ForceGraph3D()(container)
           .backgroundColor('#0a0a0b')
           .nodeLabel(n=>'<div style="background:#141416;border:1px solid #2a2a2e;padding:4px 8px;border-radius:6px;font-size:12px;color:#e2e8f0">'+escapeHtml(n.name)+'</div>')
-          .nodeColor(n=>n.color).nodeVal(n=>n.val).nodeRelSize(5).nodeOpacity(0.9)
-          .linkColor(()=>'rgba(148,163,184,0.35)').linkOpacity(0.5).linkWidth(1.2)
+          .linkColor(l=>l.color||'rgba(148,163,184,0.4)')
+          .linkWidth(l=>l.type==='related'?0.6:1.4)
           .linkDirectionalParticles(2).linkDirectionalParticleWidth(1.5)
           .onNodeClick(n=>openNoteById(n.id));
+        if(typeof THREE!=='undefined')graphInstance.nodeThreeObject(n=>makeNodeObject(n));
         graphInstance.controls().autoRotate=false;
       }
       graphInstance.width(container.clientWidth).height(container.clientHeight);
-      buildGraphData().then(data=>graphInstance.graphData(data));}
+      buildGraphData(showRelated).then(data=>graphInstance.graphData(data));}
+    (function(){const b=document.getElementById('graph-related');if(b)b.addEventListener('click',function(){
+      showRelated=!showRelated;b.classList.toggle('active',showRelated);
+      if(graphInstance)buildGraphData(showRelated).then(d=>graphInstance.graphData(d));});})();
+
 
     const COMMANDS=[
       {id:'new-note',label:'新規ノート作成',icon:'plus',run:()=>createNote()},
