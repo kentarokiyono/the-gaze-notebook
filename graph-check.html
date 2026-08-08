@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Gaze 3D Graph - Full Fixed</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      background: #0a0a0b;
+      color: #e2e8f0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Inter", "Hiragino Sans", "Hiragino Kaku Gothic ProN", Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    #graph-3d {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      min-height: 100vh;
+    }
+
+    #graph-3d canvas {
+      display: block;
+    }
+
+    #toolbar {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 30;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      max-width: calc(100vw - 24px);
+    }
+
+    #toolbar button {
+      appearance: none;
+      border: 1px solid #2a2a2e;
+      background: rgba(20, 20, 22, 0.88);
+      color: #e2e8f0;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      backdrop-filter: blur(8px);
+    }
+
+    #toolbar button:hover {
+      border-color: #475569;
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    #toolbar button.active {
+      border-color: rgba(96, 165, 250, 0.55);
+      color: #bfdbfe;
+      background: rgba(0, 122, 255, 0.12);
+    }
+
+    #status {
+      position: fixed;
+      left: 12px;
+      bottom: 12px;
+      z-index: 30;
+      max-width: calc(100vw - 24px);
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(15, 15, 18, 0.88);
+      border: 1px solid #2a2a2e;
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      backdrop-filter: blur(8px);
+    }
+
+    #status.error {
+      border-color: rgba(239, 68, 68, 0.55);
+      color: #fecaca;
+    }
+
+    #status.ok {
+      border-color: rgba(96, 165, 250, 0.35);
+      color: #dbeafe;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="graph-reset">リセット</button>
+    <button id="graph-rotate">自動回転</button>
+    <button id="graph-related">関連リンク</button>
+    <button id="graph-sample">サンプル</button>
+  </div>
+
+  <div id="graph-3d"></div>
+  <div id="status">読み込み中...</div>
+
+  <!--
+    まず通常読み込み。
+    これで失敗しても、下のJSがフォールバックを読みに行きます。
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph@1/dist/3d-force-graph.min.js"></script>
+
+  <script>
+  (() => {
+    /**
+     * まず表示を最優先するため、カスタムTHREEノードは初期値 false。
+     * これで表示されたら true にすることでラベル付き球体ノードを有効化できます。
+     */
+    const ENABLE_CUSTOM_THREE_NODES = false;
+
+    const DB_NAME = "TheGazeDB";
+    const DB_VERSION = 1;
+    const NOTES_STORE = "notes";
+    const LS_KEY = "gaze_notes_ls";
+
+    let __backend = null;
+
+    function idbOpen() {
+      return new Promise((resolve, reject) => {
+        if (typeof indexedDB === "undefined") {
+          reject(new Error("no indexedDB"));
+          return;
+        }
+
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onerror = () => reject(request.error || new Error("idb error"));
+        request.onsuccess = () => resolve(request.result);
+
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(NOTES_STORE)) {
+            const store = db.createObjectStore(NOTES_STORE, { keyPath: "id" });
+            store.createIndex("updatedAt", "updatedAt", { unique: false });
+          }
+        };
+      });
+    }
+
+    async function detectBackend() {
+      if (__backend) return __backend;
+
+      try {
+        if (typeof indexedDB === "undefined") throw new Error("no indexedDB");
+        const db = await idbOpen();
+        db.close();
+        __backend = "idb";
+      } catch (e) {
+        __backend = "ls";
+      }
+
+      return __backend;
+    }
+
+    function lsReadAll() {
+      try {
+        const obj = JSON.parse(localStorage.getItem(LS_KEY) || "{}");
+        return obj && typeof obj === "object" ? obj : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function idbGetAll() {
+      return new Promise((resolve, reject) => {
+        idbOpen()
+          .then((db) => {
+            const request = db
+              .transaction(NOTES_STORE, "readonly")
+              .objectStore(NOTES_STORE)
+              .getAll();
+
+            request.onsuccess = () => {
+              db.close();
+              const notes = request.result || [];
+              notes.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+              resolve(notes);
+            };
+
+            request.onerror = () => {
+              db.close();
+              reject(request.error);
+            };
+          })
+          .catch(reject);
+      });
+    }
+
+    class TheGazeDB {
+      static async getAllNotes() {
+        const backend = await detectBackend();
+
+        if (backend === "idb") {
+          return idbGetAll();
+        }
+
+        const arr = Object.values(lsReadAll());
+        arr.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        return arr;
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return "";
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function extractTags(text) {
+      const tags = new Set();
+      if (!text) return [];
+
+      const re = /(?:^|\s)#([^\s#]+)/g;
+      let m;
+
+      while ((m = re.exec(text)) !== null) {
+        let tag = m[1].replace(/[.,!?;:、。()（）\[\]{}]+$/, "");
+        if (tag.length > 0 && !/^\d+$/.test(tag)) {
+          tags.add(tag);
+        }
+      }
+
+      return [...tags];
+    }
+
+    function hashHue(s) {
+      let h = 0;
+      for (let i = 0; i < s.length; i++) {
+        h = (h * 31 + s.charCodeAt(i)) | 0;
+      }
+      return Math.abs(h) % 360;
+    }
+
+    function nodeColor(note) {
+      if (note.pinned) return "#60a5fa";
+
+      const tags = extractTags((note.title || "") + " " + (note.content || ""));
+      if (tags.length) {
+        return "hsl(" + hashHue(tags[0].toLowerCase()) + ",60%,60%)";
+      }
+
+      return "#64748b";
+    }
+
+    const JP_STOP = new Set([
+      "する", "した", "して", "ある", "ない", "いる", "なる", "こと", "もの",
+      "ため", "これ", "それ", "あれ", "この", "その", "どこ", "から", "まで",
+      "より", "ます", "です", "のが", "として", "について", "において",
+      "または", "および", "そして", "しかし", "だから", "つまり", "例えば"
+    ]);
+
+    const tokenCache = new Map();
+
+    function tokenizeNote(note) {
+      const text = (note.title || "") + "\n" + (note.content || "");
+
+      const cleaned = text
+        .replace(/\u0060\u0060\u0060[\s\S]*?\u0060\u0060\u0060/g, " ")
+        .replace(/\u0060[^\u0060]*\u0060/g, " ");
+
+      const tokens = new Set();
+
+      for (const t of extractTags(cleaned)) {
+        tokens.add("tag:" + t.toLowerCase());
+      }
+
+      const links = cleaned.match(/\[\[([^\]]+)\]\]/g);
+      if (links) {
+        for (const l of links) {
+          tokens.add("link:" + l.slice(2, -2).trim().toLowerCase());
+        }
+      }
+
+      const words = cleaned.match(/[A-Za-z0-9_]{3,}/g);
+      if (words) {
+        for (const w of words) {
+          tokens.add("w:" + w.toLowerCase());
+        }
+      }
+
+      const cjk = cleaned.match(/[\u3040-\u30ff\u4e00-\u9fff]{2,}/g);
+      if (cjk) {
+        for (const run of cjk) {
+          for (let i = 0; i < run.length - 1; i++) {
+            const bigram = run.substr(i, 2);
+            if (!JP_STOP.has(bigram)) {
+              tokens.add("g:" + bigram);
+            }
+          }
+        }
+      }
+
+      return tokens;
+    }
+
+    function getTokenSet(note) {
+      const key = note.id + ":" + (note.updatedAt || 0);
+
+      if (tokenCache.has(key)) {
+        return tokenCache.get(key);
+      }
+
+      if (tokenCache.size > 200) {
+        tokenCache.clear();
+      }
+
+      const tokens = tokenizeNote(note);
+      tokenCache.set(key, tokens);
+      return tokens;
+    }
+
+    function computeRelated(current, notes) {
+      const currentTokens = getTokenSet(current);
+      if (currentTokens.size < 3) return [];
+
+      const out = [];
+
+      for (const note of notes) {
+        if (note.id === current.id) continue;
+        if (!(note.title || "").trim() && !(note.content || "").trim()) continue;
+
+        const tokens = getTokenSet(note);
+        if (tokens.size === 0) continue;
+
+        let shared = 0;
+        let weight = 0;
+
+        const small = currentTokens.size <= tokens.size ? currentTokens : tokens;
+        const big = currentTokens.size <= tokens.size ? tokens : currentTokens;
+
+        for (const t of small) {
+          if (big.has(t)) {
+            shared++;
+            weight += t.startsWith("tag:") ? 3 : t.startsWith("link:") ? 4 : 1;
+          }
+        }
+
+        if (shared === 0) continue;
+
+        out.push({
+          note,
+          shared,
+          weight,
+          overlap: shared / small.size
+        });
+      }
+
+      out.sort((a, b) => (b.weight + b.overlap * 10) - (a.weight + a.overlap * 10));
+      return out.slice(0, 6);
+    }
+
+    function textSprite(main, sub) {
+      if (typeof THREE === "undefined") return null;
+
+      const canvas = document.createElement("canvas");
+      let ctx = canvas.getContext("2d");
+
+      const fontMain = '600 28px -apple-system, "Helvetica Neue", Arial, sans-serif';
+      const fontSub = '400 20px -apple-system, "Helvetica Neue", Arial, sans-serif';
+
+      let mainText = main || "";
+      if (mainText.length > 16) mainText = mainText.substring(0, 15) + "…";
+
+      let subText = sub || "";
+      if (subText.length > 16) subText = subText.substring(0, 15) + "…";
+
+      ctx.font = fontMain;
+      const wMain = ctx.measureText(mainText).width;
+
+      ctx.font = fontSub;
+      const wSub = subText ? ctx.measureText(subText).width : 0;
+
+      const w = Math.ceil(Math.max(wMain, wSub)) + 20;
+      const h = subText ? 70 : 44;
+
+      canvas.width = w;
+      canvas.height = h;
+
+      ctx = canvas.getContext("2d");
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(0,0,0,0.85)";
+      ctx.shadowBlur = 6;
+
+      if (subText) {
+        ctx.font = fontSub;
+        ctx.fillStyle = "rgba(148,163,184,0.9)";
+        ctx.fillText(subText, w / 2, 18);
+      }
+
+      ctx.font = fontMain;
+      ctx.fillStyle = "rgba(235,240,250,0.95)";
+      ctx.fillText(mainText, w / 2, subText ? 48 : 22);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.minFilter = THREE.LinearFilter;
+
+      const sprite = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+          depthWrite: false
+        })
+      );
+
+      sprite.scale.set(w / 16, h / 16, 1);
+      return sprite;
+    }
+
+    function makeNodeObject(node) {
+      if (typeof THREE === "undefined") return null;
+
+      const group = new THREE.Group();
+      const value = node.val || 4;
+      const radius = 2 + Math.cbrt(value) * 1.6;
+
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 20, 20),
+        new THREE.MeshBasicMaterial({
+          color: node.color || "#64748b",
+          transparent: true,
+          opacity: 0.92
+        })
+      );
+
+      group.add(mesh);
+
+      const label = textSprite(node.title, node.parentName);
+      if (label) {
+        label.position.set(0, -(radius + 6), 0);
+        group.add(label);
+      }
+
+      return group;
+    }
+
+    function sampleData() {
+      return {
+        nodes: [
+          {
+            id: "sample_root",
+            title: "サンプルハブ",
+            parentName: null,
+            name: "サンプルハブ",
+            val: 10,
+            color: "#60a5fa"
+          },
+          {
+            id: "sample_idea",
+            title: "アイデア",
+            parentName: "サンプルハブ",
+            name: "サンプルハブ / アイデア",
+            val: 7,
+            color: "#34d399"
+          },
+          {
+            id: "sample_task",
+            title: "タスク",
+            parentName: "サンプルハブ",
+            name: "サンプルハブ / タスク",
+            val: 6,
+            color: "#fbbf24"
+          },
+          {
+            id: "sample_memo",
+            title: "メモ",
+            parentName: "サンプルハブ",
+            name: "サンプルハブ / メモ",
+            val: 5,
+            color: "#a78bfa"
+          },
+          {
+            id: "sample_question",
+            title: "問い",
+            parentName: "アイデア",
+            name: "アイデア / 問い",
+            val: 5,
+            color: "#f472b6"
+          }
+        ],
+        links: [
+          {
+            source: "sample_root",
+            target: "sample_idea",
+            type: "link",
+            color: "rgba(148,163,184,0.5)"
+          },
+          {
+            source: "sample_root",
+            target: "sample_task",
+            type: "link",
+            color: "rgba(148,163,184,0.5)"
+          },
+          {
+            source: "sample_root",
+            target: "sample_memo",
+            type: "link",
+            color: "rgba(148,163,184,0.5)"
+          },
+          {
+            source: "sample_idea",
+            target: "sample_question",
+            type: "link",
+            color: "rgba(148,163,184,0.5)"
+          },
+          {
+            source: "sample_task",
+            target: "sample_memo",
+            type: "related",
+            color: "rgba(167,139,250,0.5)"
+          }
+        ]
+      };
+    }
+
+    async function buildGraphData(includeRelated) {
+      const notes = await TheGazeDB.getAllNotes();
+
+      const titleMap = {};
+      const byId = {};
+
+      notes.forEach((n) => {
+        byId[n.id] = n;
+        if (n.title) titleMap[n.title.toLowerCase()] = n.id;
+      });
+
+      const nodes = notes.map((n) => {
+        const title = n.title || "Untitled";
+        const parentName =
+          n.parentId && byId[n.parentId]
+            ? byId[n.parentId].title || "Untitled"
+            : null;
+
+        return {
+          id: n.id,
+          title,
+          parentName,
+          name: parentName ? parentName + " / " + title : title,
+          val: Math.min(18, 2 + ((n.content || "").length / 300)),
+          color: nodeColor(n)
+        };
+      });
+
+      const links = [];
+      const seen = new Set();
+
+      notes.forEach((n) => {
+        const matches = (n.content || "").match(/\[\[([^\]]+)\]\]/g) || [];
+
+        matches.forEach((m) => {
+          const targetTitle = m.slice(2, -2).trim().toLowerCase();
+          const target = titleMap[targetTitle];
+
+          if (target && target !== n.id) {
+            const key = [n.id, target].sort().join("|");
+
+            if (!seen.has(key)) {
+              seen.add(key);
+              links.push({
+                source: n.id,
+                target,
+                type: "link",
+                color: "rgba(148,163,184,0.5)"
+              });
+            }
+          }
+        });
+      });
+
+      if (includeRelated) {
+        for (const n of notes) {
+          const related = computeRelated(n, notes)
+            .filter((r) => r.weight >= 5 && r.overlap >= 0.12)
+            .slice(0, 3);
+
+          for (const r of related) {
+            const key = [n.id, r.note.id].sort().join("|");
+
+            if (!seen.has(key)) {
+              seen.add(key);
+              links.push({
+                source: n.id,
+                target: r.note.id,
+                type: "related",
+                color: "rgba(167,139,250,0.5)"
+              });
+            }
+          }
+        }
+      }
+
+      return { nodes, links };
+    }
+
+    let graphInstance = null;
+    let showRelated = false;
+
+    const statusEl = document.getElementById("status");
+
+    function setStatus(message, type = "info") {
+      if (!statusEl) return;
+      statusEl.textContent = message;
+      statusEl.className = type === "error" ? "error" : type === "ok" ? "ok" : "";
+    }
+
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = src;
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("script load failed: " + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    async function ensureLibraries() {
+      setStatus("ライブラリを確認中...");
+
+      const threeCandidates = [
+        "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js",
+        "https://unpkg.com/three@0.160.0/build/three.min.js"
+      ];
+
+      const graphCandidates = [
+        "https://cdn.jsdelivr.net/npm/3d-force-graph@1/dist/3d-force-graph.min.js",
+        "https://unpkg.com/3d-force-graph@1/dist/3d-force-graph.min.js",
+        "https://unpkg.com/3d-force-graph"
+      ];
+
+      if (typeof THREE === "undefined") {
+        for (const src of threeCandidates) {
+          try {
+            await loadScript(src);
+            if (typeof THREE !== "undefined") break;
+          } catch (e) {
+            console.warn("THREE fallback failed:", src, e);
+          }
+        }
+      }
+
+      if (typeof ForceGraph3D === "undefined") {
+        for (const src of graphCandidates) {
+          try {
+            await loadScript(src);
+            if (typeof ForceGraph3D !== "undefined") break;
+          } catch (e) {
+            console.warn("3d-force-graph fallback failed:", src, e);
+          }
+        }
+      }
+    }
+
+    async function initGraph(forcedData) {
+      const container = document.getElementById("graph-3d");
+
+      if (!container) {
+        setStatus("#graph-3d がありません", "error");
+        return;
+      }
+
+      if (typeof ForceGraph3D === "undefined") {
+        setStatus(
+          "ForceGraph3D が未定義です。\nCDN読み込みがブロックされているか、オフラインの可能性があります。",
+          "error"
+        );
+        return;
+      }
+
+      if (typeof ForceGraph3D !== "function") {
+        setStatus(
+          "ForceGraph3D が function ではありません。\n読み込まれているライブラリの形式が違います。",
+          "error"
+        );
+        return;
+      }
+
+      try {
+        if (!graphInstance) {
+          graphInstance = ForceGraph3D()(container)
+            .backgroundColor("#0a0a0b")
+            .nodeLabel(
+              (n) =>
+                '<div style="background:#141416;border:1px solid #2a2a2e;padding:4px 8px;border-radius:6px;font-size:12px;color:#e2e8f0">' +
+                escapeHtml(n.name || n.title || n.id) +
+                "</div>"
+            )
+            .nodeColor((n) => n.color || "#64748b")
+            .nodeVal((n) => n.val || 4)
+            .linkColor((l) => l.color || "rgba(148,163,184,0.4)")
+            .linkWidth((l) => (l.type === "related" ? 0.6 : 1.4))
+            .linkDirectionalParticles(2)
+            .linkDirectionalParticleWidth(1.5)
+            .onNodeClick((n) => {
+              setStatus("選択: " + (n.name || n.title || n.id), "ok");
+            });
+
+          if (ENABLE_CUSTOM_THREE_NODES && typeof THREE !== "undefined") {
+            graphInstance.nodeThreeObject((n) => makeNodeObject(n));
+          }
+
+          const controls = graphInstance.controls && graphInstance.controls();
+          if (controls) controls.autoRotate = false;
+        }
+
+        const width = container.clientWidth || window.innerWidth;
+        const height = container.clientHeight || window.innerHeight;
+
+        graphInstance.width(width).height(height);
+
+        let data;
+
+        if (forcedData) {
+          data = forcedData;
+        } else {
+          try {
+            data = await buildGraphData(showRelated);
+          } catch (err) {
+            console.error("buildGraphData error:", err);
+            data = { nodes: [], links: [] };
+          }
+        }
+
+        if (!data.nodes.length) {
+          data = sampleData();
+          setStatus(
+            "ノートが0件または取得できなかったため、サンプルを表示しています。",
+            "ok"
+          );
+        } else {
+          setStatus(
+            "表示中: ノート " + data.nodes.length + " 件 / リンク " + data.links.length + " 件",
+            "ok"
+          );
+        }
+
+        graphInstance.graphData(data);
+
+        setTimeout(() => {
+          if (graphInstance) graphInstance.zoomToFit(400);
+        }, 500);
+      } catch (err) {
+        console.error("initGraph error:", err);
+        setStatus(
+          "初期化エラー: " + (err && err.message ? err.message : String(err)),
+          "error"
+        );
+      }
+    }
+
+    const resetBtn = document.getElementById("graph-reset");
+    if (resetBtn) {
+      resetBtn.addEventListener("click", () => {
+        if (graphInstance) graphInstance.zoomToFit(400);
+      });
+    }
+
+    const rotateBtn = document.getElementById("graph-rotate");
+    if (rotateBtn) {
+      rotateBtn.addEventListener("click", function () {
+        if (!graphInstance) return;
+
+        const controls = graphInstance.controls && graphInstance.controls();
+        if (!controls) return;
+
+        controls.autoRotate = !controls.autoRotate;
+        this.classList.toggle("active", controls.autoRotate);
+      });
+    }
+
+    const relatedBtn = document.getElementById("graph-related");
+    if (relatedBtn) {
+      relatedBtn.addEventListener("click", async function () {
+        showRelated = !showRelated;
+        this.classList.toggle("active", showRelated);
+        await initGraph();
+      });
+    }
+
+    const sampleBtn = document.getElementById("graph-sample");
+    if (sampleBtn) {
+      sampleBtn.addEventListener("click", () => {
+        initGraph(sampleData());
+      });
+    }
+
+    let resizeTimer = null;
+
+    window.addEventListener("resize", () => {
+      if (!graphInstance) return;
+
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const container = document.getElementById("graph-3d");
+        if (!container) return;
+
+        graphInstance
+          .width(container.clientWidth || window.innerWidth)
+          .height(container.clientHeight || window.innerHeight);
+      }, 150);
+    });
+
+    async function boot() {
+      await ensureLibraries();
+      await initGraph();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", boot);
+    } else {
+      boot();
+    }
+  })();
+  </script>
+</body>
+</html>
