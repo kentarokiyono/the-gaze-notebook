@@ -12,8 +12,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://unpkg.com/three@0.152.2/build/three.min.js"></script>
-  <script src="https://unpkg.com/3d-force-graph/dist/3d-force-graph.min.js"></script>
   <script>
     tailwind.config={darkMode:'class',theme:{extend:{colors:{
       'gaze-bg':'#0a0a0b','gaze-surface':'#141416','gaze-surface-light':'#1c1c1f',
@@ -21,8 +19,6 @@
   </script>
   <link rel="stylesheet" href="style.css">
 </head>
-  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script src="https://unpkg.com/3d-force-graph@1/dist/3d-force-graph.min.js"></script>
 <body class="bg-gaze-bg text-slate-200 overflow-hidden">
   <div class="flex h-screen w-screen">
     <nav class="w-[52px] bg-gaze-surface border-r border-gaze-border flex flex-col items-center py-3 gap-1 flex-shrink-0">
@@ -202,8 +198,10 @@
           </div>
         </aside>
       </section>
-      <section id="view-graph" class="view hidden relative">
-        <div id="graph-3d" class="w-full h-full"></div>
+      
+      <!-- ✅ 修正ポイント: flex flex-col h-full を追加し、内部の graph-3d の高さを確保 -->
+      <section id="view-graph" class="view hidden flex flex-col h-full relative">
+        <div id="graph-3d" class="flex-1 min-h-0 w-full"></div>
         <div class="absolute top-4 left-4 bg-gaze-surface/80 border border-gaze-border rounded-lg px-3 py-2 text-[11px] text-slate-400 backdrop-blur">
           <p class="font-semibold text-slate-200 mb-1">思考ネットワーク</p>
           <p>ドラッグで回転・ノードをクリックで開く</p>
@@ -216,6 +214,8 @@
       </section>
     </main>
   </div>
+  
+  <!-- モーダル群 -->
   <div id="palette-overlay" class="hidden fixed inset-0 modal-backdrop z-[60] flex items-start justify-center pt-[15vh] px-4">
     <div class="bg-gaze-surface border border-gaze-border rounded-xl w-full max-w-xl shadow-2xl overflow-hidden">
       <div class="flex items-center gap-2 px-4 py-3 border-b border-gaze-border">
@@ -304,18 +304,26 @@
       <div id="notion-pages-container" class="flex-1 overflow-y-auto space-y-2"></div>
     </div>
   </div>
-<script>
-(function(){
-  function show(msg){var d=document.getElementById('gaze-dbg');
-    if(!d){d=document.createElement('div');d.id='gaze-dbg';
-      d.style.cssText='position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;font-size:12px;padding:10px;z-index:99999;white-space:pre-wrap;';
-      document.documentElement.appendChild(d);}
-    d.textContent=msg;}
-  window.addEventListener('error',function(e){show('JS Error: '+e.message+' (line '+(e.lineno||'?')+')');});
-  window.addEventListener('unhandledrejection',function(e){show('非同期エラー: '+((e.reason&&e.reason.message)?e.reason.message:e.reason));});
-  if(!window.lucide){window.lucide={createIcons:function(){}};show('注意: Lucideが読込めないためアイコンを省略して動作します');}
-})();
-</script>
+
+  <!-- エラーキャッチ用デバッグスクリプト -->
+  <script>
+  (function(){
+    function show(msg){var d=document.getElementById('gaze-dbg');
+      if(!d){d=document.createElement('div');d.id='gaze-dbg';
+        d.style.cssText='position:fixed;left:0;right:0;bottom:0;background:#7f1d1d;color:#fff;font-size:12px;padding:10px;z-index:99999;white-space:pre-wrap;';
+        document.documentElement.appendChild(d);}
+      d.textContent=msg;}
+    window.addEventListener('error',function(e){show('JS Error: '+e.message+' (line '+(e.lineno||'?')+')');});
+    window.addEventListener('unhandledrejection',function(e){show('非同期エラー: '+((e.reason&&e.reason.message)?e.reason.message:e.reason));});
+    if(!window.lucide){window.lucide={createIcons:function(){}};show('注意: Lucideが読込めないためアイコンを省略して動作します');}
+  })();
+  </script>
+
+  <!-- ✅ 修正ポイント: 3Dグラフ用ライブラリをここで1回だけ、正しい順序・バージョンで読み込む -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/3d-force-graph@1.73.3/dist/3d-force-graph.min.js"></script>
+
+  <!-- アプリ本体 -->
   <script src="app.js"></script>
   <script src="app2.js"></script>
 </body>
