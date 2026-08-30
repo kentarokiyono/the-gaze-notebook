@@ -77,6 +77,7 @@
               <button id="dash-new-note" class="btn-ghost flex items-center gap-2 text-slate-300 px-4 py-2 rounded-lg text-sm border border-gaze-border"><i data-lucide="plus" class="w-4 h-4"></i>新規ノート</button>
               <button id="new-database-btn" class="btn-ghost flex items-center gap-2 text-slate-300 px-4 py-2 rounded-lg text-sm border border-gaze-border"><i data-lucide="table" class="w-4 h-4"></i>新規データベース</button>
               <button id="template-picker-btn" class="btn-ghost flex items-center gap-2 text-slate-300 px-4 py-2 rounded-lg text-sm border border-gaze-border"><i data-lucide="layout-template" class="w-4 h-4"></i>テンプレート</button>
+              <button id="new-canvas-btn" class="btn-ghost flex items-center gap-2 text-slate-300 px-4 py-2 rounded-lg text-sm border border-gaze-border"><i data-lucide="layout-dashboard" class="w-4 h-4"></i>新規キャンバス</button>
             </div>
             <div class="mb-6">
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3" style="letter-spacing:.05em;">Tags</p>
@@ -148,6 +149,7 @@
             <div id="wikilink-modal" class="hidden fixed z-50 bg-gaze-surface border border-gaze-border rounded-xl shadow-2xl w-72 max-h-64 overflow-y-auto fade-in"><div id="wikilink-suggestions"></div></div>
           </div>
           <div id="db-view" class="hidden flex-1 overflow-y-auto min-h-0"></div>
+          <div id="canvas-view" class="hidden flex-1 min-h-0 relative"></div>
           <div id="backlinks-panel" class="hidden border-t border-gaze-border bg-gaze-surface/20">
             <button id="backlinks-toggle" class="w-full px-6 py-2 flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors">
               <i data-lucide="corner-up-left" class="w-3.5 h-3.5"></i><span>このノートを参照</span><span id="backlinks-count" class="text-blue-400 font-semibold">0</span>
@@ -338,5 +340,6 @@
   <script src="db.js"></script>
   <script src="search.js"></script>
   <script src="templates.js"></script>
+  <script src="canvas.js"></script>
 </body>
 </html>
