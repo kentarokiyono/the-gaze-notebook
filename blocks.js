@@ -27,6 +27,8 @@
     { type: 'code', label: 'コード', sub: 'コードブロック', icon: 'code', kw: 'code こーど' },
     { type: 'image', label: '画像', sub: '画像を挿入', icon: 'image', kw: 'image img 画像 がぞう' },
     { type: 'inlinedb', label: 'インラインDB', sub: 'ページ内データベース', icon: 'table', kw: 'database db table インライン でーたべーす' },
+    { type: 'bookmark', label: 'ブックマーク', sub: 'URLをカード表示', icon: 'bookmark', kw: 'bookmark link url ぶっくまーく りんく' },
+    { type: 'webembed', label: 'Web埋め込み', sub: 'ページをiframe表示', icon: 'globe', kw: 'web embed iframe browser ぶらうざ うぇぶ' },
     { type: 'divider', label: '区切り線', sub: '水平線', icon: 'minus', kw: 'divider hr line くぎり せん' },
   ];
 
@@ -170,6 +172,7 @@
       }
       if ((m = l.match(/^(#{1,3})\s+(.*)$/))) { out.push({ id: uid(), type: 'h' + m[1].length, text: m[2] }); i++; continue; }
       if ((m = l.match(/^!\[\[([^\]]+)\]\]\s*$/))) { out.push({ id: uid(), type: 'embed', text: m[1].trim() }); i++; continue; }
+      if ((m = l.match(/^@web\((card|frame)\)\{(.+)\}\s*$/))) { out.push({ id: uid(), type: 'web', mode: m[1], url: m[2].trim(), text: '' }); i++; continue; }
       if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(l)) { out.push({ id: uid(), type: 'divider', text: '' }); i++; continue; }
       if ((m = l.match(/^>\s?\[!(\w+)\][ \t]*(.*)$/))) { out.push({ id: uid(), type: 'callout', variant: m[1].toLowerCase(), text: m[2] }); i++; continue; }
       if ((m = l.match(/^>\s?(.*)$/))) { out.push({ id: uid(), type: 'quote', text: m[1] }); i++; continue; }
@@ -194,6 +197,7 @@
       case 'callout': return '> [!' + (b.variant || 'note') + '] ' + b.text;
       case 'code': return '```' + (b.lang || '') + '\n' + (b.text || '') + '\n```';
       case 'inlinedb': return '```gaze-db\n' + JSON.stringify(b.dbData || {}) + '\n```';
+      case 'web': return '@web(' + (b.mode || 'card') + '){' + (b.url || '') + '}';
       case 'embed': return '![[' + b.text + ']]';
       case 'divider': return '---';
       default: return b.text;
@@ -307,6 +311,8 @@
       }
       return row;
     }
+
+    if (b.type === 'web') { createWebRow(row, b); return row; }
 
     if (b.type === 'divider') {
       const d = document.createElement('div');
@@ -452,6 +458,69 @@
     if (typeof showToast === 'function') showToast('画像を挿入しました', 'success');
   }
 
+  // ---- Web埋め込み / ブックマーク -------------------------------------------
+  function embedUrl(url) {
+    try {
+      const u = new URL(url);
+      let m;
+      if (/(^|\.)youtube\.com$/.test(u.hostname) && u.searchParams.get('v')) return 'https://www.youtube.com/embed/' + u.searchParams.get('v');
+      if (u.hostname === 'youtu.be') return 'https://www.youtube.com/embed/' + u.pathname.slice(1);
+      if (/(^|\.)vimeo\.com$/.test(u.hostname) && (m = u.pathname.match(/\/(\d+)/))) return 'https://player.vimeo.com/video/' + m[1];
+      return url;
+    } catch (e) { return url; }
+  }
+  function domainOf(url) { try { return new URL(url).hostname.replace(/^www\./, ''); } catch (e) { return url; } }
+  function renderWebBody(bodyEl, b) {
+    if (!b.url) { bodyEl.innerHTML = '<div class="web-empty">上のバーにURLを入力してください</div>'; return; }
+    if (b.mode === 'frame') {
+      const src = embedUrl(b.url);
+      bodyEl.innerHTML = '<iframe class="web-frame" src="' + esc(src) + '" sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation" referrerpolicy="no-referrer" loading="lazy"></iframe>' +
+        '<div class="web-frame-note">表示されない場合、そのサイトは埋め込みを許可していません。<b class="web-to-card">カード表示に切替</b></div>';
+      const tc = bodyEl.querySelector('.web-to-card');
+      if (tc) tc.addEventListener('click', () => { b.mode = 'card'; syncToModel(); const row = rowOf(b.id); if (row) rebuildWebBody(row, b); });
+    } else {
+      const dom = domainOf(b.url);
+      bodyEl.innerHTML =
+        '<a class="web-card" href="' + esc(b.url) + '" target="_blank" rel="noopener">' +
+        '<img class="web-fav" src="https://www.google.com/s2/favicons?domain=' + esc(dom) + '&sz=64" alt="" onerror="this.style.display=\'none\'">' +
+        '<div class="web-card-main"><div class="web-card-dom">' + esc(dom) + '</div><div class="web-card-url">' + esc(b.url) + '</div></div>' +
+        '<i data-lucide="arrow-up-right" class="w-4 h-4 web-card-go"></i></a>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+  function rebuildWebBody(row, b) {
+    const body = row.querySelector('.web-body'); if (body) renderWebBody(body, b);
+    const tog = row.querySelector('.web-toggle'); if (tog) tog.innerHTML = b.mode === 'frame' ? '<i data-lucide="layout" class="w-3.5 h-3.5"></i>カード' : '<i data-lucide="globe" class="w-3.5 h-3.5"></i>埋め込み';
+    if (window.lucide) lucide.createIcons();
+  }
+  function createWebRow(row, b) {
+    const box = document.createElement('div');
+    box.className = 'web-block';
+    box.innerHTML =
+      '<div class="web-bar">' +
+      '<i data-lucide="globe" class="w-3.5 h-3.5 web-bar-ic"></i>' +
+      '<input class="web-url" placeholder="https://…" value="' + esc(b.url || '') + '">' +
+      '<button class="web-btn web-reload" title="再読み込み"><i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i></button>' +
+      '<button class="web-btn web-toggle" title="表示切替">' + (b.mode === 'frame' ? '<i data-lucide="layout" class="w-3.5 h-3.5"></i>カード' : '<i data-lucide="globe" class="w-3.5 h-3.5"></i>埋め込み') + '</button>' +
+      '<button class="web-btn web-open" title="新規タブで開く"><i data-lucide="external-link" class="w-3.5 h-3.5"></i></button>' +
+      '<button class="web-btn web-remove" title="削除"><i data-lucide="x" class="w-3.5 h-3.5"></i></button>' +
+      '</div><div class="web-body"></div>';
+    row.appendChild(box);
+    const body = box.querySelector('.web-body');
+    renderWebBody(body, b);
+    const inp = box.querySelector('.web-url');
+    const commit = () => { const v = inp.value.trim(); if (v && !/^https?:\/\//.test(v)) inp.value = 'https://' + v; b.url = inp.value.trim(); syncToModel(); renderWebBody(body, b); };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    inp.addEventListener('blur', commit);
+    box.querySelector('.web-reload').addEventListener('click', () => renderWebBody(body, b));
+    box.querySelector('.web-toggle').addEventListener('click', () => { b.mode = b.mode === 'frame' ? 'card' : 'frame'; syncToModel(); rebuildWebBody(row, b); });
+    box.querySelector('.web-open').addEventListener('click', () => { if (b.url) window.open(b.url, '_blank', 'noopener'); });
+    box.querySelector('.web-remove').addEventListener('click', () => {
+      const idx = blocks.findIndex((x) => x.id === b.id); if (idx >= 0) { blocks.splice(idx, 1); if (!blocks.length) blocks.push({ id: uid(), type: 'paragraph', text: '' }); renderAll(); syncToModel(); }
+    });
+    if (window.lucide) lucide.createIcons();
+  }
+
   // ---- editable events ------------------------------------------------------
   function bindEditable(ce, b, row) {
     ce.addEventListener('mousedown', (e) => {
@@ -500,8 +569,16 @@
           if (it.type && it.type.indexOf('image/') === 0) { e.preventDefault(); const f = it.getAsFile(); if (f) insertImageFile(f, b.id); return; }
         }
       }
-      e.preventDefault();
       const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+      // 空ブロックにURLだけを貼り付け → ブックマークカードに変換
+      if ((b.text || '') === '' && /^https?:\/\/\S+$/.test(t.trim())) {
+        e.preventDefault();
+        b.type = 'web'; b.mode = 'card'; b.url = t.trim(); b.text = '';
+        const idx = blocks.findIndex((x) => x.id === b.id);
+        if (!blocks[idx + 1]) blocks.splice(idx + 1, 0, { id: uid(), type: 'paragraph', text: '' });
+        renderAll(); syncToModel(); return;
+      }
+      e.preventDefault();
       document.execCommand('insertText', false, t);
     });
     ce.addEventListener('click', (e) => {
@@ -731,6 +808,14 @@
       const after = { id: uid(), type: 'paragraph', text: '' };
       blocks.splice(idx + 1, 0, after);
       renderAll(); syncToModel(); return;
+    }
+    if (type === 'bookmark' || type === 'webembed') {
+      b.type = 'web'; b.mode = type === 'webembed' ? 'frame' : 'card'; b.url = b.url || ''; b.text = '';
+      const idx = blocks.findIndex((x) => x.id === b.id);
+      if (!blocks[idx + 1]) blocks.splice(idx + 1, 0, { id: uid(), type: 'paragraph', text: '' });
+      renderAll(); syncToModel();
+      const r = rowOf(b.id); const inp = r && r.querySelector('.web-url'); if (inp) inp.focus();
+      return;
     }
     if (type === 'callout') { b.type = 'callout'; b.variant = b.variant || 'note'; }
     else { b.type = type; }

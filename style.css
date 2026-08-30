@@ -249,6 +249,27 @@ code,pre,kbd,samp{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospac
 .cv-picker-item{padding:9px 12px;border-radius:8px;font-size:13px;color:#cbd5e1;cursor:pointer;}
 .cv-picker-item:hover{background:rgba(0,122,255,.13);color:#fff;}
 .cv-picker-empty{padding:20px;text-align:center;color:#64748b;font-size:13px;}
+/* ===== Web embed / Bookmark (Phase 9) ===== */
+.web-block{flex:1;min-width:0;border:1px solid #2a2a2e;border-radius:11px;overflow:hidden;background:rgba(255,255,255,.01);}
+.web-bar{display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid #2a2a2e;background:rgba(255,255,255,.02);}
+.web-bar-ic{color:#64748b;flex-shrink:0;}
+.web-url{flex:1;min-width:0;background:#0a0a0b;border:1px solid #2a2a2e;border-radius:7px;padding:6px 10px;color:#e2e8f0;font-size:12.5px;outline:none;font-family:'JetBrains Mono','SF Mono',monospace!important;}
+.web-url:focus{border-color:rgba(0,122,255,.5);}
+.web-btn{display:flex;align-items:center;gap:5px;font-size:11px;color:#94a3b8;padding:6px 8px;border-radius:7px;flex-shrink:0;transition:all .12s;}
+.web-btn:hover{color:#e2e8f0;background:rgba(255,255,255,.06);}
+.web-remove:hover{color:#f87171;background:rgba(239,68,68,.1);}
+.web-body{position:relative;}
+.web-empty{padding:22px;text-align:center;color:#64748b;font-size:13px;}
+.web-frame{width:100%;height:420px;border:none;display:block;background:#fff;}
+.web-frame-note{font-size:11px;color:#64748b;padding:6px 12px;border-top:1px solid #2a2a2e;background:rgba(255,255,255,.02);}
+.web-to-card{color:#60a5fa;cursor:pointer;text-decoration:underline;}
+.web-card{display:flex;align-items:center;gap:12px;padding:14px 16px;text-decoration:none;transition:background .12s;}
+.web-card:hover{background:rgba(0,122,255,.05);}
+.web-fav{width:32px;height:32px;border-radius:7px;flex-shrink:0;background:rgba(255,255,255,.05);}
+.web-card-main{flex:1;min-width:0;}
+.web-card-dom{font-size:13px;font-weight:700;color:#f1f5f9;}
+.web-card-url{font-size:11.5px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.web-card-go{color:#60a5fa;flex-shrink:0;}
 .db-body{padding:16px;}
 .db-hint{color:#94a3b8;font-size:13px;padding:24px;text-align:center;border:1px dashed #2a2a2e;border-radius:10px;}
 /* table */
