@@ -73,6 +73,7 @@
             <div class="flex gap-2 mb-6">
               <button id="dash-open-graph" class="btn-primary flex items-center gap-2 text-white px-4 py-2 rounded-lg text-sm"><i data-lucide="box" class="w-4 h-4"></i>3Dグラフを開く</button>
               <button id="dash-new-note" class="btn-ghost flex items-center gap-2 text-slate-300 px-4 py-2 rounded-lg text-sm border border-gaze-border"><i data-lucide="plus" class="w-4 h-4"></i>新規ノート</button>
+              <button id="new-database-btn" class="btn-ghost flex items-center gap-2 text-slate-300 px-4 py-2 rounded-lg text-sm border border-gaze-border"><i data-lucide="table" class="w-4 h-4"></i>新規データベース</button>
             </div>
             <div class="mb-6">
               <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3" style="letter-spacing:.05em;">Tags</p>
@@ -100,7 +101,7 @@
             <button id="import-from-notion-btn" class="text-btn"><i data-lucide="arrow-down-to-line" class="w-3.5 h-3.5"></i>Notionから</button>
             <button id="send-to-notion-btn" class="text-btn"><i data-lucide="arrow-up-from-line" class="w-3.5 h-3.5"></i>Notionへ</button>
           </div>
-          <div class="px-4 py-1.5 border-b border-gaze-border flex items-center gap-2 bg-gaze-surface/30 flex-wrap">
+          <div id="md-toolbar" class="px-4 py-1.5 border-b border-gaze-border flex items-center gap-2 bg-gaze-surface/30 flex-wrap">
             <div class="flex items-center gap-0.5">
               <button data-md="h1" class="tb-btn" title="見出し1"><span class="text-[11px] font-bold">H1</span></button>
               <button data-md="h2" class="tb-btn" title="見出し2"><span class="text-[11px] font-bold">H2</span></button>
@@ -143,6 +144,7 @@
             </div></div>
             <div id="wikilink-modal" class="hidden fixed z-50 bg-gaze-surface border border-gaze-border rounded-xl shadow-2xl w-72 max-h-64 overflow-y-auto fade-in"><div id="wikilink-suggestions"></div></div>
           </div>
+          <div id="db-view" class="hidden flex-1 overflow-y-auto min-h-0"></div>
           <div id="backlinks-panel" class="hidden border-t border-gaze-border bg-gaze-surface/20">
             <button id="backlinks-toggle" class="w-full px-6 py-2 flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 transition-colors">
               <i data-lucide="corner-up-left" class="w-3.5 h-3.5"></i><span>このノートを参照</span><span id="backlinks-count" class="text-blue-400 font-semibold">0</span>
@@ -329,5 +331,6 @@
   <script src="app.js"></script>
   <script src="app2.js"></script>
   <script src="blocks.js"></script>
+  <script src="db.js"></script>
 </body>
 </html>
