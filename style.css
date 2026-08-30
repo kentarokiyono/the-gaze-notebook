@@ -184,6 +184,27 @@ code,pre,kbd,samp{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospac
 .db-viewtab.active{color:#f1f5f9;border-bottom-color:#007aff;}
 .db-viewadd{width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#64748b;border-radius:6px;}
 .db-viewadd:hover{color:#e2e8f0;background:rgba(255,255,255,.06);}
+.db-controls{margin-left:auto;display:flex;gap:4px;padding-bottom:4px;}
+.db-ctrl{display:flex;align-items:center;gap:5px;font-size:12px;color:#94a3b8;padding:5px 10px;border-radius:7px;transition:all .12s;}
+.db-ctrl:hover{color:#e2e8f0;background:rgba(255,255,255,.05);}
+.db-ctrl.on{color:#60a5fa;background:rgba(0,122,255,.12);}
+.db-f-row{display:flex;align-items:center;gap:5px;padding:5px 4px;}
+.db-f-prop,.db-f-op,.db-f-val,.db-s-prop{background:#0a0a0b;border:1px solid #2a2a2e;border-radius:6px;padding:5px 7px;color:#e2e8f0;font-size:12px;outline:none;min-width:0;}
+.db-f-prop{flex:1;}.db-f-op{width:78px;}.db-f-val{width:88px;}
+.db-f-prop:focus,.db-f-op:focus,.db-f-val:focus,.db-s-prop:focus{border-color:rgba(0,122,255,.5);}
+.db-f-del{color:#64748b;padding:3px;border-radius:5px;flex-shrink:0;}
+.db-f-del:hover{color:#f87171;background:rgba(239,68,68,.1);}
+.db-f-empty{color:#64748b;font-size:12px;padding:8px;text-align:center;}
+.db-f-add{display:flex;align-items:center;gap:6px;color:#60a5fa;font-size:12px;padding:7px 8px;width:100%;border-radius:6px;margin-top:4px;}
+.db-f-add:hover{background:rgba(0,122,255,.1);}
+.db-s-prop{width:100%;margin:4px 0;}
+.db-s-dir{display:flex;gap:5px;margin-top:4px;}
+.db-s-d{flex:1;font-size:12px;color:#94a3b8;border:1px solid #2a2a2e;border-radius:6px;padding:6px;}
+.db-s-d.on{color:#60a5fa;border-color:rgba(0,122,255,.5);background:rgba(0,122,255,.1);}
+.inline-db{flex:1;min-width:0;border:1px solid #2a2a2e;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.01);}
+.inline-db .db-viewbar{padding-top:6px;}
+.inline-db .db-body{padding:12px;}
+.inline-db-err{padding:16px;color:#94a3b8;font-size:13px;}
 .db-body{padding:16px;}
 .db-hint{color:#94a3b8;font-size:13px;padding:24px;text-align:center;border:1px dashed #2a2a2e;border-radius:10px;}
 /* table */

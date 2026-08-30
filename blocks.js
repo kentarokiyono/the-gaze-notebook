@@ -26,6 +26,7 @@
     { type: 'callout', label: 'コールアウト', sub: '目立つメモ', icon: 'info', kw: 'callout note info コールアウト メモ' },
     { type: 'code', label: 'コード', sub: 'コードブロック', icon: 'code', kw: 'code こーど' },
     { type: 'image', label: '画像', sub: '画像を挿入', icon: 'image', kw: 'image img 画像 がぞう' },
+    { type: 'inlinedb', label: 'インラインDB', sub: 'ページ内データベース', icon: 'table', kw: 'database db table インライン でーたべーす' },
     { type: 'divider', label: '区切り線', sub: '水平線', icon: 'minus', kw: 'divider hr line くぎり せん' },
   ];
 
@@ -153,13 +154,18 @@
       const l = lines[i];
       if (l.trim() === '') { i++; continue; }
       let m;
-      // fenced code
-      if ((m = l.match(/^```(\w*)\s*$/))) {
+      // fenced code (gaze-db はインラインDBとして扱う)
+      if ((m = l.match(/^```([\w-]*)\s*$/))) {
         const lang = m[1] || ''; i++;
         const code = [];
         while (i < lines.length && !/^```\s*$/.test(lines[i])) { code.push(lines[i]); i++; }
         i++; // closing fence
-        out.push({ id: uid(), type: 'code', text: code.join('\n'), lang });
+        if (lang === 'gaze-db') {
+          let dbData = null; try { dbData = JSON.parse(code.join('\n')); } catch (e) {}
+          out.push({ id: uid(), type: 'inlinedb', text: '', dbData: dbData || (window.GazeDB && GazeDB.newInlineDb ? GazeDB.newInlineDb() : { props: [], rows: [], views: [], activeView: null }) });
+        } else {
+          out.push({ id: uid(), type: 'code', text: code.join('\n'), lang });
+        }
         continue;
       }
       if ((m = l.match(/^(#{1,3})\s+(.*)$/))) { out.push({ id: uid(), type: 'h' + m[1].length, text: m[2] }); i++; continue; }
@@ -187,6 +193,7 @@
       case 'quote': return '> ' + b.text;
       case 'callout': return '> [!' + (b.variant || 'note') + '] ' + b.text;
       case 'code': return '```' + (b.lang || '') + '\n' + (b.text || '') + '\n```';
+      case 'inlinedb': return '```gaze-db\n' + JSON.stringify(b.dbData || {}) + '\n```';
       case 'embed': return '![[' + b.text + ']]';
       case 'divider': return '---';
       default: return b.text;
@@ -285,6 +292,19 @@
         '<div class="blk-embed-body prose prose-invert"></div>';
       card.addEventListener('click', () => openFromEl(card));
       row.appendChild(card);
+      return row;
+    }
+
+    if (b.type === 'inlinedb') {
+      const box = document.createElement('div');
+      box.className = 'inline-db';
+      row.appendChild(box);
+      if (window.GazeDB && GazeDB.mountInline) {
+        if (!b.dbData) b.dbData = GazeDB.newInlineDb();
+        setTimeout(() => GazeDB.mountInline(box, () => b.dbData, (nd) => { b.dbData = nd; syncToModel(); }), 0);
+      } else {
+        box.innerHTML = '<div class="inline-db-err">データベースを読み込めませんでした</div>';
+      }
       return row;
     }
 
@@ -704,6 +724,14 @@
     }
     if (type === 'code') { b.type = 'code'; b.lang = b.lang || ''; renderAll(); const r = rowOf(b.id); const ta = r && r.querySelector('.blk-code-ta'); if (ta) ta.focus(); syncToModel(); return; }
     if (type === 'image') { pickImage((file) => insertImageFile(file, b.id)); return; }
+    if (type === 'inlinedb') {
+      b.type = 'inlinedb'; b.text = '';
+      b.dbData = (window.GazeDB && GazeDB.newInlineDb) ? GazeDB.newInlineDb() : { props: [], rows: [], views: [], activeView: null };
+      const idx = blocks.findIndex((x) => x.id === b.id);
+      const after = { id: uid(), type: 'paragraph', text: '' };
+      blocks.splice(idx + 1, 0, after);
+      renderAll(); syncToModel(); return;
+    }
     if (type === 'callout') { b.type = 'callout'; b.variant = b.variant || 'note'; }
     else { b.type = type; }
     if (type === 'todo' && typeof b.checked === 'undefined') b.checked = false;

@@ -35,7 +35,10 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
   const cur = () => (typeof state !== 'undefined' && state ? state.currentNote : null);
-  const db = () => { const n = cur(); return n ? n.db : null; };
+  // extCtx が設定されている間はインラインDB（ブロック内DB）を操作対象にする
+  let extCtx = null; // {getDb, save, container}
+  const db = () => { if (extCtx) return extCtx.getDb(); const n = cur(); return n ? n.db : null; };
+  const ctxContainer = () => (extCtx ? extCtx.container : container);
   const prop = (id) => { const d = db(); return d && d.props.find((p) => p.id === id); };
   const titleProp = () => { const d = db(); return d && (d.props.find((p) => p.type === 'text') || d.props[0]); };
   const activeView = () => { const d = db(); return d && (d.views.find((v) => v.id === d.activeView) || d.views[0]); };
@@ -79,6 +82,11 @@
   }
 
   async function save(rerender) {
+    if (extCtx) {
+      try { extCtx.save(extCtx.getDb()); } catch (e) { console.error('inline db save', e); }
+      if (rerender !== false) render();
+      return;
+    }
     const n = cur();
     if (!n || !n.db) return;
     n.updatedAt = Date.now();
@@ -99,6 +107,57 @@
 
   function chip(name, color) {
     return '<span class="db-chip" style="background:' + color + '22;color:' + color + ';border-color:' + color + '55">' + esc(name) + '</span>';
+  }
+
+  // ---- フィルタ / ソート ----------------------------------------------------
+  const OPS = {
+    text: [['contains', '含む'], ['ncontains', '含まない'], ['empty', '空'], ['notempty', '空でない']],
+    number: [['eq', '='], ['neq', '≠'], ['gt', '>'], ['lt', '<'], ['empty', '空'], ['notempty', '空でない']],
+    url: [['contains', '含む'], ['empty', '空'], ['notempty', '空でない']],
+    select: [['is', 'である'], ['isnot', 'でない'], ['empty', '空'], ['notempty', '空でない']],
+    multi: [['has', 'を含む'], ['empty', '空'], ['notempty', '空でない']],
+    date: [['on', 'に一致'], ['before', 'より前'], ['after', 'より後'], ['empty', '空'], ['notempty', '空でない']],
+    checkbox: [['checked', 'ON'], ['unchecked', 'OFF']],
+  };
+  function isEmpty(v) { return v === '' || v == null || (Array.isArray(v) && !v.length) || v === false; }
+  function matchFilter(row, f) {
+    const p = prop(f.prop); if (!p) return true;
+    const v = cellVal(row, p);
+    switch (f.op) {
+      case 'contains': return String(v || '').toLowerCase().includes(String(f.value || '').toLowerCase());
+      case 'ncontains': return !String(v || '').toLowerCase().includes(String(f.value || '').toLowerCase());
+      case 'eq': return String(v) === String(f.value);
+      case 'neq': return String(v) !== String(f.value);
+      case 'gt': return parseFloat(v) > parseFloat(f.value);
+      case 'lt': return parseFloat(v) < parseFloat(f.value);
+      case 'is': return v === f.value;
+      case 'isnot': return v !== f.value;
+      case 'has': return Array.isArray(v) && v.includes(f.value);
+      case 'on': return v === f.value;
+      case 'before': return v && f.value && v < f.value;
+      case 'after': return v && f.value && v > f.value;
+      case 'checked': return !!v;
+      case 'unchecked': return !v;
+      case 'empty': return isEmpty(v);
+      case 'notempty': return !isEmpty(v);
+      default: return true;
+    }
+  }
+  function sortVal(row, p) {
+    const v = cellVal(row, p);
+    if (p.type === 'number') return parseFloat(v) || 0;
+    if (p.type === 'checkbox') return v ? 1 : 0;
+    if (p.type === 'select') { const i = (p.options || []).findIndex((o) => o.id === v); return i < 0 ? 999 : i; }
+    return String(v == null ? '' : v).toLowerCase();
+  }
+  function visibleRows(view) {
+    let rows = db().rows.slice();
+    (view.filters || []).forEach((f) => { rows = rows.filter((r) => matchFilter(r, f)); });
+    if (view.sort && view.sort.prop && prop(view.sort.prop)) {
+      const p = prop(view.sort.prop), dir = view.sort.dir === 'desc' ? -1 : 1;
+      rows.sort((a, b) => { const av = sortVal(a, p), bv = sortVal(b, p); return av < bv ? -dir : av > bv ? dir : 0; });
+    }
+    return rows;
   }
 
   // ---- ポップオーバー -------------------------------------------------------
@@ -250,7 +309,7 @@
 
   // ---- テーブルビュー -------------------------------------------------------
   function renderTable() {
-    const d = db();
+    const d = db(); const view = activeView();
     const wrap = document.createElement('div');
     wrap.className = 'db-table-wrap';
     const table = document.createElement('table');
@@ -274,7 +333,7 @@
     table.appendChild(thead);
     // body
     const tbody = document.createElement('tbody');
-    d.rows.forEach((row) => {
+    visibleRows(view).forEach((row) => {
       const tr = document.createElement('tr');
       tr.className = 'db-tr';
       d.props.forEach((p) => tr.appendChild(cellEl(row, p)));
@@ -317,10 +376,11 @@
     view.groupBy = gp.id;
     const groups = [{ id: '', name: '未設定', color: COLOR_HEX.slate }].concat((gp.options || []).map((o) => ({ id: o.id, name: o.name, color: COLOR_HEX[o.color] || COLOR_HEX.slate })));
     const tp = titleProp();
+    const vRows = visibleRows(view);
     groups.forEach((g) => {
       const col = document.createElement('div');
       col.className = 'db-col'; col.dataset.opt = g.id;
-      const rows = d.rows.filter((r) => (cellVal(r, gp) || '') === g.id);
+      const rows = vRows.filter((r) => (cellVal(r, gp) || '') === g.id);
       col.innerHTML = '<div class="db-col-head"><span class="db-opt-dot" style="background:' + g.color + '"></span>' +
         '<span class="db-col-name">' + esc(g.name) + '</span><span class="db-col-count">' + rows.length + '</span></div>';
       const list = document.createElement('div'); list.className = 'db-col-list';
@@ -376,7 +436,7 @@
     const first = new Date(y, m, 1), start = first.getDay(), days = new Date(y, m + 1, 0).getDate();
     const tp = titleProp();
     const byDate = {};
-    d.rows.forEach((r) => { const v = cellVal(r, dp); if (v) (byDate[v] = byDate[v] || []).push(r); });
+    visibleRows(view).forEach((r) => { const v = cellVal(r, dp); if (v) (byDate[v] = byDate[v] || []).push(r); });
     const head = document.createElement('div'); head.className = 'db-cal-head';
     head.innerHTML = '<button class="db-cal-nav" data-d="-1"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>' +
       '<span class="db-cal-title">' + y + '年' + (m + 1) + '月</span>' +
@@ -413,9 +473,9 @@
 
   // ---- ギャラリービュー -----------------------------------------------------
   function renderGallery() {
-    const d = db(), tp = titleProp();
+    const d = db(), tp = titleProp(), view = activeView();
     const wrap = document.createElement('div'); wrap.className = 'db-gallery';
-    d.rows.forEach((r) => {
+    visibleRows(view).forEach((r) => {
       const card = document.createElement('div'); card.className = 'db-gcard';
       const props = d.props.filter((p) => p !== tp).map((p) => {
         const v = cellVal(r, p);
@@ -478,11 +538,12 @@
 
   // ---- ビュータブ + 本体 ----------------------------------------------------
   function render() {
-    if (!container) return;
+    const cont = ctxContainer();
+    if (!cont) return;
     const d = db();
     if (!d) return;
     if (!d.activeView || !d.views.find((v) => v.id === d.activeView)) d.activeView = d.views[0] && d.views[0].id;
-    container.innerHTML = '';
+    cont.innerHTML = '';
     // tabs
     const bar = document.createElement('div'); bar.className = 'db-viewbar';
     const VIEW_ICON = { table: 'table', board: 'columns-3', calendar: 'calendar', gallery: 'layout-grid' };
@@ -497,17 +558,44 @@
     addV.innerHTML = '<i data-lucide="plus" class="w-3.5 h-3.5"></i>';
     addV.addEventListener('click', () => addViewMenu(addV));
     bar.appendChild(addV);
-    container.appendChild(bar);
-    // body
+    // right controls: filter + sort
     const view = activeView();
+    const ctrls = document.createElement('div'); ctrls.className = 'db-controls';
+    const nf = (view.filters || []).length;
+    const fb = document.createElement('button'); fb.className = 'db-ctrl' + (nf ? ' on' : '');
+    fb.innerHTML = '<i data-lucide="filter" class="w-3.5 h-3.5"></i>フィルタ' + (nf ? ' ' + nf : '');
+    fb.addEventListener('click', () => filterPopover(fb, view));
+    const sb = document.createElement('button'); sb.className = 'db-ctrl' + (view.sort && view.sort.prop ? ' on' : '');
+    sb.innerHTML = '<i data-lucide="arrow-up-down" class="w-3.5 h-3.5"></i>並べ替え';
+    sb.addEventListener('click', () => sortPopover(sb, view));
+    ctrls.appendChild(fb); ctrls.appendChild(sb);
+    bar.appendChild(ctrls);
+    cont.appendChild(bar);
+    // body
     let el;
     if (view.type === 'board') el = renderBoard();
     else if (view.type === 'calendar') el = renderCalendar();
     else if (view.type === 'gallery') el = renderGallery();
     else el = renderTable();
     const bodyWrap = document.createElement('div'); bodyWrap.className = 'db-body'; bodyWrap.appendChild(el);
-    container.appendChild(bodyWrap);
+    cont.appendChild(bodyWrap);
     if (window.lucide) lucide.createIcons();
+  }
+
+  // インラインDB（ブロック内）を描画。extCtx をこのインスタンスに切り替えて操作。
+  function mountInline(el, getDb, saveFn) {
+    const inst = { getDb, save: saveFn, container: el };
+    el.addEventListener('pointerdown', () => { extCtx = inst; }, true);
+    el.addEventListener('focusin', () => { extCtx = inst; }, true);
+    extCtx = inst;
+    render();
+  }
+  function newInlineDb() {
+    const d = defaultDb();
+    d.views = [{ id: uid('v'), type: 'table', name: 'テーブル' }, { id: uid('v'), type: 'board', name: 'ボード', groupBy: d.props[1].id }];
+    d.activeView = d.views[0].id;
+    d.rows = [{ id: uid('r'), cells: {} }];
+    return d;
   }
 
   function addViewMenu(anchor) {
@@ -525,12 +613,65 @@
     });
   }
 
+  function valueControl(f, p) {
+    if (f.op === 'empty' || f.op === 'notempty' || f.op === 'checked' || f.op === 'unchecked') return '';
+    if (p && (p.type === 'select' || p.type === 'multi')) {
+      return '<select class="db-f-val">' + '<option value="">—</option>' +
+        (p.options || []).map((o) => '<option value="' + o.id + '"' + (f.value === o.id ? ' selected' : '') + '>' + esc(o.name) + '</option>').join('') + '</select>';
+    }
+    const type = (p && p.type === 'date') ? 'date' : (p && p.type === 'number') ? 'number' : 'text';
+    return '<input class="db-f-val" type="' + type + '" value="' + esc(f.value || '') + '">';
+  }
+  function filterRowHtml(f, i) {
+    const d = db();
+    const p = prop(f.prop) || d.props[0];
+    const ops = OPS[p.type] || OPS.text;
+    return '<div class="db-f-row" data-i="' + i + '">' +
+      '<select class="db-f-prop">' + d.props.map((pp) => '<option value="' + pp.id + '"' + (pp.id === f.prop ? ' selected' : '') + '>' + esc(pp.name) + '</option>').join('') + '</select>' +
+      '<select class="db-f-op">' + ops.map((o) => '<option value="' + o[0] + '"' + (o[0] === f.op ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>' +
+      valueControl(f, p) +
+      '<button class="db-f-del" title="削除"><i data-lucide="x" class="w-3.5 h-3.5"></i></button></div>';
+  }
+  function filterPopover(anchor, view) {
+    view.filters = view.filters || [];
+    const build = () => '<div class="db-pop-head">フィルタ</div>' +
+      (view.filters.length ? view.filters.map((f, i) => filterRowHtml(f, i)).join('') : '<div class="db-f-empty">フィルタなし</div>') +
+      '<button class="db-f-add"><i data-lucide="plus" class="w-3.5 h-3.5"></i>フィルタを追加</button>';
+    openPopover(anchor, build(), function mount(pop) {
+      const rebuild = () => { pop.innerHTML = build(); if (window.lucide) lucide.createIcons(); mount(pop); };
+      pop.querySelectorAll('.db-f-row').forEach((rowEl) => {
+        const i = parseInt(rowEl.dataset.i); const f = view.filters[i];
+        rowEl.querySelector('.db-f-prop').addEventListener('change', (e) => { f.prop = e.target.value; const p = prop(f.prop); f.op = (OPS[p.type] || OPS.text)[0][0]; f.value = ''; save(false); rebuild(); });
+        rowEl.querySelector('.db-f-op').addEventListener('change', (e) => { f.op = e.target.value; save(false); rebuild(); });
+        const val = rowEl.querySelector('.db-f-val');
+        if (val) val.addEventListener('change', (e) => { f.value = e.target.value; save(false); });
+        if (val) val.addEventListener('input', (e) => { f.value = e.target.value; save(false); });
+        rowEl.querySelector('.db-f-del').addEventListener('click', () => { view.filters.splice(i, 1); save(false); rebuild(); });
+      });
+      pop.querySelector('.db-f-add').addEventListener('click', () => {
+        const p = db().props[0]; view.filters.push({ prop: p.id, op: (OPS[p.type] || OPS.text)[0][0], value: '' }); save(false); rebuild();
+      });
+    });
+  }
+  function sortPopover(anchor, view) {
+    const d = db();
+    const s = view.sort || { prop: '', dir: 'asc' };
+    const html = '<div class="db-pop-head">並べ替え</div>' +
+      '<select class="db-s-prop"><option value="">なし</option>' + d.props.map((p) => '<option value="' + p.id + '"' + (s.prop === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('') + '</select>' +
+      '<div class="db-s-dir"><button class="db-s-d' + (s.dir !== 'desc' ? ' on' : '') + '" data-d="asc">昇順 ↑</button><button class="db-s-d' + (s.dir === 'desc' ? ' on' : '') + '" data-d="desc">降順 ↓</button></div>';
+    openPopover(anchor, html, (pop) => {
+      pop.querySelector('.db-s-prop').addEventListener('change', (e) => { view.sort = { prop: e.target.value, dir: (view.sort && view.sort.dir) || 'asc' }; save(); });
+      pop.querySelectorAll('.db-s-d').forEach((b) => b.addEventListener('click', () => { view.sort = { prop: (view.sort && view.sort.prop) || '', dir: b.dataset.d }; save(); closePopover(); }));
+    });
+  }
+
   // ---- 表示切替 -------------------------------------------------------------
   const HIDE_IDS = ['md-toolbar', 'editor-area', 'backlinks-panel', 'related-panel'];
   function showDb() {
     HIDE_IDS.forEach((id) => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
     if (container) container.classList.remove('hidden');
     calMonth = null;
+    extCtx = null; // フルページDBを操作対象に戻す
     render();
   }
   function hideDb() {
@@ -545,6 +686,8 @@
   // ---- 初期化 & フック ------------------------------------------------------
   function boot() {
     container = document.getElementById('db-view');
+    // フルページDB領域を触ったら extCtx を解除
+    if (container) container.addEventListener('pointerdown', () => { extCtx = null; }, true);
     // loadNote をラップ（blocks.js の後段）: db ノートなら DB UI を表示
     if (typeof window.loadNote === 'function' && !window.loadNote.__gazeDbWrapped) {
       const orig = window.loadNote;
@@ -566,7 +709,7 @@
     // タイトル変更でDB名も保存（既存 note-title の input で処理済み）
   }
 
-  window.GazeDB = { createDatabase, sync, isDatabase: () => !!(cur() && cur().db) };
+  window.GazeDB = { createDatabase, sync, mountInline, newInlineDb, isDatabase: () => !!(cur() && cur().db) };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => setTimeout(boot, 0));
   else setTimeout(boot, 0);
