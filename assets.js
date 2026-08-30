@@ -69,5 +69,13 @@
     for (const id of ids) { if (!cache.has(id)) await load(id); }
   }
 
-  window.GazeAssets = { save, load, resolveSync, hydrate, preload, get };
+  function all() {
+    return new Promise((res) => {
+      open().then((db) => { const r = db.transaction(ST, 'readonly').objectStore(ST).getAll(); r.onsuccess = () => { db.close(); res(r.result || []); }; r.onerror = () => { db.close(); res([]); }; }).catch(() => res([]));
+    });
+  }
+  async function importBlob(id, blob, type, name) {
+    try { await put({ id, blob, type: type || blob.type || '', name: name || '' }); cache.delete(id); return true; } catch (e) { return false; }
+  }
+  window.GazeAssets = { save, load, resolveSync, hydrate, preload, get, all, importBlob };
 })();

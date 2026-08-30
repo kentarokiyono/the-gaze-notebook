@@ -291,6 +291,17 @@
             <button id="import-data-btn" class="flex-1 flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-sm"><i data-lucide="upload" class="w-4 h-4"></i>JSON読み込み</button>
           </div>
           <input type="file" id="import-file-input" accept=".json,.md" class="hidden">
+          <div class="border-t border-gaze-border pt-4">
+            <p class="text-sm font-medium mb-1 text-slate-300">ローカルフォルダ同期（Obsidian式）</p>
+            <p class="text-[11px] text-slate-500 mb-2">選んだフォルダに .md として保存。Dropbox/iCloud/Git等でフォルダを同期すれば複数端末で共有できます。</p>
+            <p id="vault-status" class="text-xs text-slate-500 mb-2">未接続</p>
+            <div class="flex gap-2 flex-wrap">
+              <button id="vault-pick" class="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-sm"><i data-lucide="folder" class="w-4 h-4"></i>フォルダを選択</button>
+              <button id="vault-export" class="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-sm"><i data-lucide="folder-down" class="w-4 h-4"></i>フォルダへ保存</button>
+              <button id="vault-import" class="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-gaze-border px-3 py-2 rounded-lg text-sm"><i data-lucide="folder-up" class="w-4 h-4"></i>フォルダから読込</button>
+            </div>
+            <label class="flex items-center gap-2 mt-3 text-xs text-slate-400"><input type="checkbox" id="vault-auto"> 編集時に自動保存</label>
+          </div>
           <button id="reset-all-btn" class="flex items-center gap-1.5 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-300 px-3 py-2 rounded-lg text-sm"><i data-lucide="trash-2" class="w-4 h-4"></i>すべてのデータを削除</button>
         </div>
       </div>
@@ -341,5 +352,6 @@
   <script src="search.js"></script>
   <script src="templates.js"></script>
   <script src="canvas.js"></script>
+  <script src="sync.js"></script>
 </body>
 </html>
