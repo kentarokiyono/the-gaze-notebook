@@ -25,6 +25,7 @@
     { type: 'quote', label: '引用', sub: '引用ブロック', icon: 'quote', kw: 'quote いんよう' },
     { type: 'callout', label: 'コールアウト', sub: '目立つメモ', icon: 'info', kw: 'callout note info コールアウト メモ' },
     { type: 'code', label: 'コード', sub: 'コードブロック', icon: 'code', kw: 'code こーど' },
+    { type: 'image', label: '画像', sub: '画像を挿入', icon: 'image', kw: 'image img 画像 がぞう' },
     { type: 'divider', label: '区切り線', sub: '水平線', icon: 'minus', kw: 'divider hr line くぎり せん' },
   ];
 
@@ -79,6 +80,18 @@
       if (s.startsWith('~~', i)) { j = s.indexOf('~~', i + 2); if (j > i + 1) { feed(s.slice(i + 2, j), i + 2, '<del>', '</del>'); i = j + 2; continue; } }
       if (s.startsWith('==', i)) { j = s.indexOf('==', i + 2); if (j > i + 1) { feed(s.slice(i + 2, j), i + 2, '<mark>', '</mark>'); i = j + 2; continue; } }
       if ((s[i] === '*' || s[i] === '_') && s[i + 1] !== s[i]) { j = s.indexOf(s[i], i + 1); if (j > i + 1) { feed(s.slice(i + 1, j), i + 1, '<em>', '</em>'); i = j + 1; continue; } }
+      if (s[i] === '!' && s[i + 1] === '[' && s[i + 2] !== '[') {
+        const close = s.indexOf(']', i + 2);
+        if (close > i && s[close + 1] === '(') {
+          const p = s.indexOf(')', close + 2);
+          if (p > close) {
+            const alt = s.slice(i + 2, close), url = s.slice(close + 2, p);
+            if (url.indexOf('asset:') === 0) html += '<img class="blk-img" data-asset="' + esc(url.slice(6)) + '" alt="' + esc(alt) + '">';
+            else html += '<img class="blk-img" src="' + esc(url) + '" alt="' + esc(alt) + '">';
+            i = p + 1; continue;
+          }
+        }
+      }
       if (s.startsWith('[[', i)) {
         j = s.indexOf(']]', i + 2);
         if (j > i + 1) {
@@ -372,6 +385,7 @@
     ce.classList.add('blk-rendered');
     ce._map = r.map;
     ce._plain = r.plain;
+    if (window.GazeAssets && ce.querySelector('img[data-asset]')) GazeAssets.hydrate(ce);
   }
 
   // 現在の選択（ブラウザが配置したカーソル）から表示文字オフセットを得る
@@ -397,6 +411,25 @@
     if (wl) { if (typeof window.openNoteByTitle === 'function') window.openNoteByTitle(wl.dataset.wikilink); return; }
     const a = el.closest && el.closest('a[data-mdlink]');
     if (a) { window.open(a.getAttribute('href'), '_blank', 'noopener'); return; }
+  }
+
+  // ---- 画像挿入 -------------------------------------------------------------
+  function pickImage(cb) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.style.display = 'none';
+    inp.addEventListener('change', () => { const f = inp.files && inp.files[0]; if (f) cb(f); inp.remove(); });
+    document.body.appendChild(inp); inp.click();
+  }
+  async function insertImageFile(file, afterId) {
+    if (!file || !window.GazeAssets || !/^image\//.test(file.type || '')) return;
+    let id;
+    try { id = await GazeAssets.save(file, file.name); } catch (e) { if (typeof showToast === 'function') showToast('画像の保存に失敗しました', 'error'); return; }
+    const idx = afterId ? blocks.findIndex((x) => x.id === afterId) : blocks.length - 1;
+    const imgBlock = { id: uid(), type: 'paragraph', text: '![' + (file.name || '') + '](asset:' + id + ')' };
+    const after = { id: uid(), type: 'paragraph', text: '' };
+    blocks.splice(idx + 1, 0, imgBlock, after);
+    renderAll(); focusBlock(after.id, 0); syncToModel();
+    if (typeof showToast === 'function') showToast('画像を挿入しました', 'success');
   }
 
   // ---- editable events ------------------------------------------------------
@@ -441,6 +474,12 @@
     });
     ce.addEventListener('keydown', (e) => onKeydown(e, ce, b));
     ce.addEventListener('paste', (e) => {
+      const items = e.clipboardData && e.clipboardData.items;
+      if (items) {
+        for (const it of items) {
+          if (it.type && it.type.indexOf('image/') === 0) { e.preventDefault(); const f = it.getAsFile(); if (f) insertImageFile(f, b.id); return; }
+        }
+      }
       e.preventDefault();
       const t = (e.clipboardData || window.clipboardData).getData('text/plain');
       document.execCommand('insertText', false, t);
@@ -664,6 +703,7 @@
       renderAll(); focusBlock(nb.id, 0); syncToModel(); return;
     }
     if (type === 'code') { b.type = 'code'; b.lang = b.lang || ''; renderAll(); const r = rowOf(b.id); const ta = r && r.querySelector('.blk-code-ta'); if (ta) ta.focus(); syncToModel(); return; }
+    if (type === 'image') { pickImage((file) => insertImageFile(file, b.id)); return; }
     if (type === 'callout') { b.type = 'callout'; b.variant = b.variant || 'note'; }
     else { b.type = type; }
     if (type === 'todo' && typeof b.checked === 'undefined') b.checked = false;
@@ -880,6 +920,12 @@
     if (!container || !textarea) return;
     blocks = mdToBlocks(textarea.value);
     renderAll();
+    // 画像アセットを事前ロードして再ハイドレート
+    if (window.GazeAssets && /asset:/.test(textarea.value)) {
+      GazeAssets.preload(textarea.value).then(() => {
+        container.querySelectorAll('img[data-asset]').forEach((im) => { if (im.dataset.assetHydrated !== '1') GazeAssets.hydrate(im.parentNode || container); });
+      });
+    }
   }
 
   function isActive() {
@@ -929,6 +975,20 @@
       }
     });
 
+    // 画像ファイルのドラッグ&ドロップ
+    container.addEventListener('dragover', (e) => {
+      if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) { e.preventDefault(); container.classList.add('drop-file'); }
+    });
+    container.addEventListener('dragleave', (e) => { if (e.target === container) container.classList.remove('drop-file'); });
+    container.addEventListener('drop', (e) => {
+      const files = e.dataTransfer && e.dataTransfer.files;
+      container.classList.remove('drop-file');
+      if (files && files.length) {
+        const imgs = Array.prototype.filter.call(files, (f) => /^image\//.test(f.type));
+        if (imgs.length) { e.preventDefault(); imgs.reduce((pr, f) => pr.then(() => insertImageFile(f, lastFocusedId)), Promise.resolve()); }
+      }
+    });
+
     // メニュー外クリックで閉じる
     document.addEventListener('mousedown', (e) => {
       if (slash.open && menuEl && !menuEl.contains(e.target)) closeSlash();
@@ -972,6 +1032,20 @@
         return orig.apply(this, arguments);
       };
       window.applyMd.__gazeWrapped = true;
+    }
+
+    // renderPreview をラップして、プレビュー内の画像もハイドレート
+    if (typeof window.renderPreview === 'function' && !window.renderPreview.__gazeWrapped) {
+      const orig = window.renderPreview;
+      window.renderPreview = function () {
+        const r = orig.apply(this, arguments);
+        try {
+          const pc = document.getElementById('preview-content');
+          if (pc && window.GazeAssets) { GazeAssets.preload(pc.innerHTML).then(() => GazeAssets.hydrate(pc)); GazeAssets.hydrate(pc); }
+        } catch (e) {}
+        return r;
+      };
+      window.renderPreview.__gazeWrapped = true;
     }
 
     // 既にノートが開かれていれば描画
