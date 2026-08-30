@@ -147,3 +147,29 @@ code,pre,kbd,samp{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospac
 .slash-item.sel .slash-ic{color:#60a5fa;background:rgba(0,122,255,.12);}
 .slash-item>div:last-child{font-size:13px;line-height:1.25;}
 .slash-sub{font-size:11px;color:#64748b;}
+/* ===== Live Preview (Phase 2) ===== */
+.block-content.blk-rendered{cursor:text;}
+.block-content strong{font-weight:700;color:#f1f5f9;}
+.block-content em{font-style:italic;}
+.block-content del{color:#64748b;}
+.block-content mark{background:rgba(250,204,21,.25);color:#fde68a;padding:0 .15em;border-radius:3px;}
+.block-content code{background:rgba(0,122,255,.15);color:#64b5f6;padding:.1em .35em;border-radius:4px;font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace!important;font-size:.9em;}
+.block-content a[data-mdlink]{color:#64b5f6;text-decoration:underline;text-underline-offset:2px;cursor:pointer;}
+.block-content.blk-rendered .wikilink,.block-content.blk-rendered a[data-mdlink]{cursor:pointer;}
+/* 見出し折りたたみ */
+.block-fold{opacity:0;width:18px;min-height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#64748b;border-radius:5px;margin-top:1px;transition:opacity .12s,transform .15s,color .12s;}
+.block-row:hover .block-fold{opacity:1;}
+.block-fold:hover{color:#e2e8f0;background:rgba(255,255,255,.06);}
+.block-fold.folded{opacity:1;transform:rotate(-90deg);color:#60a5fa;}
+/* 埋め込み ![[note]] */
+.blk-embed{flex:1;min-width:0;border:1px solid #2a2a2e;border-radius:10px;background:rgba(255,255,255,.02);overflow:hidden;cursor:pointer;transition:border-color .12s,background .12s;}
+.blk-embed:hover{border-color:rgba(0,122,255,.45);background:rgba(0,122,255,.04);}
+.blk-embed.missing{border-style:dashed;}
+.blk-embed-head{display:flex;align-items:center;gap:7px;padding:8px 12px;border-bottom:1px solid #2a2a2e;color:#93c5fd;font-size:12.5px;font-weight:600;background:rgba(0,122,255,.05);}
+.blk-embed.missing .blk-embed-head{color:#94a3b8;background:transparent;}
+.blk-embed-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.blk-embed-open{opacity:.6;flex-shrink:0;}
+.blk-embed-body{padding:10px 14px;max-height:340px;overflow-y:auto;font-size:14px;}
+.blk-embed-body>*:first-child{margin-top:0;}
+.blk-embed-body>*:last-child{margin-bottom:0;}
+.blk-embed-missing{color:#64748b;font-size:13px;font-style:italic;}

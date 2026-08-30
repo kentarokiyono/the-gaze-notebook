@@ -47,6 +47,8 @@
   let selectedDividerId = null;
   const slash = { open: false, blockId: null, pos: 0, index: 0, items: [] };
   let menuEl = null;
+  const foldedIds = new Set();  // 折りたたみ中の見出しブロックID
+  let clickPending = null;      // クリックでフォーカス中のブロックID（カーソル位置マッピング用）
 
   const uid = () => 'blk_' + Math.random().toString(36).slice(2, 9);
   const getBlock = (id) => blocks.find((b) => b.id === id);
@@ -57,6 +59,77 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
   }
+
+  // インラインMarkdownを整形HTMLへ。表示文字→ソース位置の対応表(map)も返し、
+  // クリック位置からソースのカーソル位置を復元できるようにする。
+  function renderInline(src) {
+    const s = String(src || '');
+    let html = '', plain = '';
+    const map = [];
+    const feed = (text, srcStart, open, close) => {
+      html += (open || '');
+      for (let k = 0; k < text.length; k++) { map[plain.length] = srcStart + k; plain += text[k]; }
+      html += esc(text) + (close || '');
+    };
+    let i = 0;
+    while (i < s.length) {
+      let j;
+      if (s[i] === '`') { j = s.indexOf('`', i + 1); if (j > i) { feed(s.slice(i + 1, j), i + 1, '<code>', '</code>'); i = j + 1; continue; } }
+      if (s.startsWith('**', i)) { j = s.indexOf('**', i + 2); if (j > i + 1) { feed(s.slice(i + 2, j), i + 2, '<strong>', '</strong>'); i = j + 2; continue; } }
+      if (s.startsWith('~~', i)) { j = s.indexOf('~~', i + 2); if (j > i + 1) { feed(s.slice(i + 2, j), i + 2, '<del>', '</del>'); i = j + 2; continue; } }
+      if (s.startsWith('==', i)) { j = s.indexOf('==', i + 2); if (j > i + 1) { feed(s.slice(i + 2, j), i + 2, '<mark>', '</mark>'); i = j + 2; continue; } }
+      if ((s[i] === '*' || s[i] === '_') && s[i + 1] !== s[i]) { j = s.indexOf(s[i], i + 1); if (j > i + 1) { feed(s.slice(i + 1, j), i + 1, '<em>', '</em>'); i = j + 1; continue; } }
+      if (s.startsWith('[[', i)) {
+        j = s.indexOf(']]', i + 2);
+        if (j > i + 1) {
+          const raw = s.slice(i + 2, j);
+          const pipe = raw.indexOf('|');
+          const target = (pipe >= 0 ? raw.slice(0, pipe) : raw).trim();
+          const disp = pipe >= 0 ? raw.slice(pipe + 1) : raw;
+          const dispStart = i + 2 + (pipe >= 0 ? pipe + 1 : 0);
+          html += '<a class="wikilink" data-wikilink="' + esc(target) + '">';
+          feed(disp, dispStart);
+          html += '</a>';
+          i = j + 2; continue;
+        }
+      }
+      if (s[i] === '[') {
+        const close = s.indexOf(']', i + 1);
+        if (close > i && s[close + 1] === '(') {
+          const p = s.indexOf(')', close + 2);
+          if (p > close) {
+            const url = s.slice(close + 2, p);
+            html += '<a href="' + esc(url) + '" target="_blank" rel="noopener" data-mdlink="1">';
+            feed(s.slice(i + 1, close), i + 1);
+            html += '</a>';
+            i = p + 1; continue;
+          }
+        }
+      }
+      feed(s[i], i); i++;
+    }
+    map[plain.length] = s.length;
+    return { html, map, plain };
+  }
+
+  // ノート本文から指定見出しのセクションを抽出（埋め込み ![[note#heading]] 用）
+  function sectionOf(content, name) {
+    const lines = String(content || '').split('\n');
+    let start = -1, lvl = 0;
+    for (let k = 0; k < lines.length; k++) {
+      const mm = lines[k].match(/^(#{1,6})\s+(.*)$/);
+      if (mm && mm[2].trim().toLowerCase() === name.trim().toLowerCase()) { start = k; lvl = mm[1].length; break; }
+    }
+    if (start < 0) return null;
+    let end = lines.length;
+    for (let k = start + 1; k < lines.length; k++) {
+      const mm = lines[k].match(/^(#{1,6})\s+/);
+      if (mm && mm[1].length <= lvl) { end = k; break; }
+    }
+    return lines.slice(start + 1, end).join('\n').trim();
+  }
+
+  const headingLevel = (b) => (b.type === 'h1' ? 1 : b.type === 'h2' ? 2 : b.type === 'h3' ? 3 : 0);
 
   // ---- Markdown <-> blocks ---------------------------------------------------
   function mdToBlocks(md) {
@@ -77,6 +150,7 @@
         continue;
       }
       if ((m = l.match(/^(#{1,3})\s+(.*)$/))) { out.push({ id: uid(), type: 'h' + m[1].length, text: m[2] }); i++; continue; }
+      if ((m = l.match(/^!\[\[([^\]]+)\]\]\s*$/))) { out.push({ id: uid(), type: 'embed', text: m[1].trim() }); i++; continue; }
       if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(l)) { out.push({ id: uid(), type: 'divider', text: '' }); i++; continue; }
       if ((m = l.match(/^>\s?\[!(\w+)\][ \t]*(.*)$/))) { out.push({ id: uid(), type: 'callout', variant: m[1].toLowerCase(), text: m[2] }); i++; continue; }
       if ((m = l.match(/^>\s?(.*)$/))) { out.push({ id: uid(), type: 'quote', text: m[1] }); i++; continue; }
@@ -100,6 +174,7 @@
       case 'quote': return '> ' + b.text;
       case 'callout': return '> [!' + (b.variant || 'note') + '] ' + b.text;
       case 'code': return '```' + (b.lang || '') + '\n' + (b.text || '') + '\n```';
+      case 'embed': return '![[' + b.text + ']]';
       case 'divider': return '---';
       default: return b.text;
     }
@@ -176,6 +251,30 @@
     row.appendChild(handle);
     bindDrag(row, handle, b);
 
+    // 見出しの折りたたみトグル
+    if (headingLevel(b) > 0) {
+      const fold = document.createElement('button');
+      fold.className = 'block-fold' + (foldedIds.has(b.id) ? ' folded' : '');
+      fold.title = 'セクションを折りたたむ';
+      fold.innerHTML = '<i data-lucide="chevron-down" class="w-3.5 h-3.5"></i>';
+      fold.addEventListener('click', (e) => { e.stopPropagation(); toggleFold(b.id); });
+      row.appendChild(fold);
+    }
+
+    if (b.type === 'embed') {
+      const card = document.createElement('div');
+      card.className = 'blk-embed';
+      card.dataset.target = b.text;
+      card.innerHTML =
+        '<div class="blk-embed-head"><i data-lucide="corner-down-right" class="w-3.5 h-3.5"></i>' +
+        '<span class="blk-embed-title">' + esc(b.text) + '</span>' +
+        '<i data-lucide="arrow-up-right" class="w-3.5 h-3.5 blk-embed-open"></i></div>' +
+        '<div class="blk-embed-body prose prose-invert"></div>';
+      card.addEventListener('click', () => openFromEl(card));
+      row.appendChild(card);
+      return row;
+    }
+
     if (b.type === 'divider') {
       const d = document.createElement('div');
       d.className = 'block-divider-wrap';
@@ -239,7 +338,7 @@
     ce.contentEditable = 'true';
     ce.spellcheck = false;
     ce.dataset.ph = PLACEHOLDER[b.type] || '';
-    ce.textContent = b.text || '';
+    renderInlineToEl(ce, b);
     bindEditable(ce, b, row);
     if (b.type === 'callout') {
       const inner = document.createElement('div');
@@ -255,9 +354,77 @@
     return row;
   }
 
+  // ---- live preview: 編集(ソース) ⇄ 表示(整形) の切替 -----------------------
+  function isEditing(ce) { return ce.dataset.editing === '1'; }
+  function enterEdit(ce, b) {
+    if (ce.dataset.editing === '1') return;
+    ce.dataset.editing = '1';
+    ce.textContent = b.text || '';
+    ce.classList.remove('blk-rendered');
+  }
+  function exitEdit(ce, b) {
+    ce.dataset.editing = '';
+    renderInlineToEl(ce, b);
+  }
+  function renderInlineToEl(ce, b) {
+    const r = renderInline(b.text || '');
+    ce.innerHTML = r.html;
+    ce.classList.add('blk-rendered');
+    ce._map = r.map;
+    ce._plain = r.plain;
+  }
+
+  // 現在の選択（ブラウザが配置したカーソル）から表示文字オフセットを得る
+  function renderedSelOffset(ce) {
+    const s = window.getSelection();
+    if (!s.rangeCount) return (ce._plain || '').length;
+    const r = s.getRangeAt(0);
+    if (!ce.contains(r.startContainer)) return (ce._plain || '').length;
+    const range = document.createRange();
+    range.selectNodeContents(ce);
+    try { range.setEnd(r.startContainer, r.startOffset); } catch (_) { return (ce._plain || '').length; }
+    return range.toString().length;
+  }
+
+  function openFromEl(el) {
+    const emb = el.closest && el.closest('.blk-embed');
+    if (emb) {
+      if (emb.dataset.noteId && typeof window.openNoteById === 'function') window.openNoteById(emb.dataset.noteId);
+      else if (typeof window.openNoteByTitle === 'function') window.openNoteByTitle((emb.dataset.target || '').split('#')[0].trim());
+      return;
+    }
+    const wl = el.closest && el.closest('.wikilink');
+    if (wl) { if (typeof window.openNoteByTitle === 'function') window.openNoteByTitle(wl.dataset.wikilink); return; }
+    const a = el.closest && el.closest('a[data-mdlink]');
+    if (a) { window.open(a.getAttribute('href'), '_blank', 'noopener'); return; }
+  }
+
   // ---- editable events ------------------------------------------------------
   function bindEditable(ce, b, row) {
-    ce.addEventListener('focus', () => { lastFocusedId = b.id; clearDividerSel(); });
+    ce.addEventListener('mousedown', (e) => {
+      if (isEditing(ce)) return; // 既に編集中は通常挙動
+      const link = e.target.closest('.wikilink,a[data-mdlink]');
+      if (link) { e.preventDefault(); openFromEl(link); return; }
+      // preventDefaultせず、ブラウザにカーソルを配置させ click で位置を読み取る
+      clickPending = b.id;
+    });
+    ce.addEventListener('click', () => {
+      if (clickPending === b.id && !isEditing(ce)) {
+        const rOff = renderedSelOffset(ce);
+        const sOff = (ce._map && ce._map[rOff] != null) ? ce._map[rOff] : (b.text || '').length;
+        enterEdit(ce, b);
+        setCaret(ce, sOff);
+      }
+      clickPending = null;
+    });
+    ce.addEventListener('focus', () => {
+      lastFocusedId = b.id; clearDividerSel();
+      if (!isEditing(ce) && clickPending !== b.id) { enterEdit(ce, b); setCaret(ce, (b.text || '').length); }
+    });
+    ce.addEventListener('blur', () => {
+      if (slash.open && slash.blockId === b.id) return; // メニュー操作中は維持
+      exitEdit(ce, b);
+    });
     ce.addEventListener('compositionstart', () => { composing = true; });
     ce.addEventListener('compositionend', () => {
       composing = false;
@@ -273,6 +440,11 @@
       maybeSlash(ce, b);
     });
     ce.addEventListener('keydown', (e) => onKeydown(e, ce, b));
+    ce.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertText', false, t);
+    });
     ce.addEventListener('click', (e) => {
       if (e.metaKey || e.ctrlKey) tryOpenWikilink(ce, b);
     });
@@ -388,11 +560,12 @@
     else if ((m = t.match(/^>\s\[!(\w+)\]\s?(.*)$/))) { b.type = 'callout'; b.variant = m[1].toLowerCase(); b.text = m[2]; changed = true; }
     else if ((m = t.match(/^>\s(.*)$/))) { b.type = 'quote'; b.text = m[1]; changed = true; }
     else if (/^(-{3}|\*{3})$/.test(t)) { b.type = 'divider'; b.text = ''; changed = true; }
+    else if ((m = t.match(/^!\[\[([^\]]+)\]\]$/))) { b.type = 'embed'; b.text = m[1].trim(); changed = true; }
     else if ((m = t.match(/^```(\w*)$/))) { b.type = 'code'; b.lang = m[1] || ''; b.text = ''; changed = true; }
 
     if (!changed) return false;
     closeSlash();
-    if (b.type === 'divider') {
+    if (b.type === 'divider' || b.type === 'embed') {
       const idx = blocks.findIndex((x) => x.id === b.id);
       const nb = { id: uid(), type: 'paragraph', text: '' };
       blocks.splice(idx + 1, 0, nb);
@@ -630,13 +803,76 @@
       container.appendChild(createRow(b, num));
     }
     if (window.lucide) lucide.createIcons();
+    applyFolds();
+    fillEmbeds();
+  }
+
+  // 折りたたみ中の見出し配下を隠す
+  function applyFolds() {
+    let hideLevel = 0;
+    for (const b of blocks) {
+      const lvl = headingLevel(b);
+      const row = rowOf(b.id);
+      let hide = false;
+      if (hideLevel > 0) {
+        if (lvl > 0 && lvl <= hideLevel) hideLevel = 0;
+        else hide = true;
+      }
+      if (row) row.style.display = hide ? 'none' : '';
+      if (!hide && lvl > 0 && foldedIds.has(b.id)) hideLevel = lvl;
+    }
+  }
+
+  function toggleFold(id) {
+    if (foldedIds.has(id)) foldedIds.delete(id); else foldedIds.add(id);
+    const row = rowOf(id);
+    const fold = row && row.querySelector('.block-fold');
+    if (fold) fold.classList.toggle('folded', foldedIds.has(id));
+    applyFolds();
+  }
+
+  // 埋め込みカードに対象ノートの内容を流し込む
+  async function fillEmbeds() {
+    const cards = container.querySelectorAll('.blk-embed[data-target]');
+    if (!cards.length) return;
+    let notes = [];
+    try { notes = await TheGazeDB.getAllNotes(); } catch (e) { return; }
+    const byTitle = {};
+    notes.forEach((n) => { if (n.title) byTitle[n.title.toLowerCase()] = n; });
+    cards.forEach((el) => {
+      const target = el.dataset.target || '';
+      const hash = target.indexOf('#');
+      const name = (hash >= 0 ? target.slice(0, hash) : target).trim();
+      const heading = hash >= 0 ? target.slice(hash + 1).trim() : '';
+      const titleEl = el.querySelector('.blk-embed-title');
+      const bodyEl = el.querySelector('.blk-embed-body');
+      const n = byTitle[name.toLowerCase()];
+      if (!n) {
+        el.classList.add('missing');
+        if (titleEl) titleEl.textContent = target;
+        if (bodyEl) bodyEl.innerHTML = '<span class="blk-embed-missing">未作成のノート — クリックで作成</span>';
+        delete el.dataset.noteId;
+        return;
+      }
+      el.classList.remove('missing');
+      el.dataset.noteId = n.id;
+      if (titleEl) titleEl.textContent = (n.title || 'Untitled') + (heading ? ' › ' + heading : '');
+      let content = n.content || '';
+      if (heading) { const sec = sectionOf(content, heading); if (sec != null) content = sec; }
+      if (bodyEl) {
+        try { bodyEl.innerHTML = window.marked ? marked.parse(content) : esc(content); }
+        catch (e) { bodyEl.textContent = content; }
+        bodyEl.querySelectorAll('a').forEach((a) => { a.addEventListener('click', (ev) => ev.preventDefault()); });
+      }
+    });
   }
 
   function focusBlock(id, offset) {
     const r = rowOf(id);
     if (!r) return;
+    const b = getBlock(id);
     const ce = r.querySelector('.block-content');
-    if (ce) { setCaret(ce, offset); ce.scrollIntoView({ block: 'nearest' }); }
+    if (ce && b) { enterEdit(ce, b); setCaret(ce, offset); ce.scrollIntoView({ block: 'nearest' }); }
   }
 
   // ---- 公開API --------------------------------------------------------------
