@@ -25,9 +25,11 @@
     try { notes = await TheGazeDB.getAllNotes(); } catch (e) {}
     let note = notes.find((n) => n.daily && n.dailyDate === iso) || notes.find((n) => n.title === iso);
     if (!note) {
+      let content = '';
+      try { if (window.GazeTemplates && GazeTemplates.dailyContent) content = GazeTemplates.dailyContent(iso) || ''; } catch (e) {}
       note = {
         id: (typeof newId === 'function' ? newId() : 'note_' + Date.now()),
-        title: iso, content: '', parentId: null,
+        title: iso, content, parentId: null,
         createdAt: Date.now(), updatedAt: Date.now(), daily: true, dailyDate: iso,
       };
       await TheGazeDB.addNote(note);
