@@ -51,6 +51,8 @@
   let selectedDividerId = null;
   const slash = { open: false, blockId: null, pos: 0, index: 0, items: [] };
   let menuEl = null;
+  const wl = { open: false, blockId: null, start: 0, index: 0, items: [] }; // [[ リンク補完
+  let wlEl = null;
   const foldedIds = new Set();  // 折りたたみ中の見出しブロックID
   let clickPending = null;      // クリックでフォーカス中のブロックID（カーソル位置マッピング用）
 
@@ -552,14 +554,14 @@
       composing = false;
       b.text = ce.textContent;
       if (maybeShortcut(b)) return;
-      syncToModel(); maybeSlash(ce, b);
+      syncToModel(); maybeSlash(ce, b); maybeWiki(ce, b);
     });
     ce.addEventListener('input', () => {
       b.text = ce.textContent;
       if (composing) return;
       if (maybeShortcut(b)) return;
       syncToModel();
-      maybeSlash(ce, b);
+      maybeSlash(ce, b); maybeWiki(ce, b);
     });
     ce.addEventListener('keydown', (e) => onKeydown(e, ce, b));
     ce.addEventListener('paste', (e) => {
@@ -594,6 +596,13 @@
       if (e.key === 'ArrowUp') { e.preventDefault(); moveSlash(-1); return; }
       if (e.key === 'Enter') { e.preventDefault(); applySlash(slash.items[slash.index]); return; }
       if (e.key === 'Escape') { e.preventDefault(); closeSlash(); return; }
+    }
+    // [[ リンク補完 navigation
+    if (wl.open && wl.blockId === b.id) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveWiki(1); return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); moveWiki(-1); return; }
+      if (e.key === 'Enter') { e.preventDefault(); applyWiki(wl.items[wl.index]); return; }
+      if (e.key === 'Escape') { e.preventDefault(); closeWiki(); return; }
     }
 
     const mod = e.metaKey || e.ctrlKey;
@@ -777,6 +786,65 @@
   function closeSlash() {
     slash.open = false; slash.blockId = null; slash.items = [];
     if (menuEl) menuEl.classList.add('hidden');
+  }
+
+  // ---- [[ リンク補完 --------------------------------------------------------
+  function ensureWlMenu() {
+    if (wlEl) return wlEl;
+    wlEl = document.createElement('div'); wlEl.id = 'wl-menu'; wlEl.className = 'hidden';
+    document.body.appendChild(wlEl); return wlEl;
+  }
+  function closeWiki() { wl.open = false; wl.blockId = null; wl.items = []; if (wlEl) wlEl.classList.add('hidden'); }
+  async function maybeWiki(ce, b) {
+    const off = caretOffset(ce);
+    const before = (b.text || '').slice(0, off);
+    const m = before.match(/\[\[([^\[\]\n]*)$/);
+    if (!m) { closeWiki(); return; }
+    const q = m[1];
+    const start = off - q.length - 2;
+    let notes = [];
+    try { notes = await TheGazeDB.getAllNotes(); } catch (e) { closeWiki(); return; }
+    const ql = q.toLowerCase();
+    const curId = (typeof state !== 'undefined' && state && state.currentNote) ? state.currentNote.id : null;
+    let items = notes.filter((n) => n.id !== curId && (n.title || '').toLowerCase().includes(ql)).slice(0, 8)
+      .map((n) => ({ title: n.title || 'Untitled' }));
+    const exact = items.some((it) => it.title.toLowerCase() === ql);
+    if (q.trim() && !exact) items.push({ title: q.trim(), create: true });
+    if (!items.length) { closeWiki(); return; }
+    wl.open = true; wl.blockId = b.id; wl.start = start; wl.index = 0; wl.items = items;
+    drawWiki(ce);
+  }
+  function drawWiki(ce) {
+    const el = ensureWlMenu();
+    el.innerHTML = wl.items.map((it, i) =>
+      '<div class="wl-item' + (i === wl.index ? ' sel' : '') + '" data-i="' + i + '">' +
+      '<i data-lucide="' + (it.create ? 'plus' : 'file-text') + '" class="w-3.5 h-3.5"></i>' +
+      '<span class="truncate">' + (it.create ? '「' + esc(it.title) + '」を作成' : esc(it.title)) + '</span></div>').join('');
+    el.classList.remove('hidden');
+    const sel = window.getSelection(); let rect = null;
+    if (sel.rangeCount) { const r = sel.getRangeAt(0).getClientRects()[0]; if (r) rect = r; }
+    if (!rect) rect = ce.getBoundingClientRect();
+    el.style.top = Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 260)) + 'px';
+    el.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - 260)) + 'px';
+    if (window.lucide) lucide.createIcons();
+    el.querySelectorAll('.wl-item').forEach((d) => {
+      d.addEventListener('mousedown', (e) => { e.preventDefault(); applyWiki(wl.items[parseInt(d.dataset.i)]); });
+      d.addEventListener('mousemove', () => { wl.index = parseInt(d.dataset.i); wlEl.querySelectorAll('.wl-item').forEach((x, i) => x.classList.toggle('sel', i === wl.index)); });
+    });
+  }
+  function moveWiki(dir) {
+    wl.index = (wl.index + dir + wl.items.length) % wl.items.length;
+    if (wlEl) wlEl.querySelectorAll('.wl-item').forEach((x, i) => x.classList.toggle('sel', i === wl.index));
+  }
+  function applyWiki(item) {
+    if (!item) { closeWiki(); return; }
+    const b = getBlock(wl.blockId); const start = wl.start; closeWiki();
+    if (!b) return;
+    const r = rowOf(b.id); const ce = r && r.querySelector('.block-content');
+    const caret = ce ? caretOffset(ce) : (b.text || '').length;
+    const insert = '[[' + item.title + ']]';
+    b.text = (b.text || '').slice(0, start) + insert + (b.text || '').slice(caret);
+    renderAll(); focusBlock(b.id, start + insert.length); syncToModel();
   }
 
   function applySlash(item) {
@@ -1105,6 +1173,7 @@
     // メニュー外クリックで閉じる
     document.addEventListener('mousedown', (e) => {
       if (slash.open && menuEl && !menuEl.contains(e.target)) closeSlash();
+      if (wl.open && wlEl && !wlEl.contains(e.target)) closeWiki();
       if (selectedDividerId && !e.target.closest('.block-divider-wrap')) clearDividerSel();
     });
     document.addEventListener('keydown', (e) => {
