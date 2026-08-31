@@ -12,6 +12,13 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- リッチコンテンツ: コード色分け / Mermaid図 / 数式(KaTeX) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
   <script>
     tailwind.config={darkMode:'class',theme:{extend:{colors:{
       'gaze-bg':'#0a0a0b','gaze-surface':'#141416','gaze-surface-light':'#1c1c1f',
@@ -357,5 +364,6 @@
   <script src="canvas.js"></script>
   <script src="sync.js"></script>
   <script src="ui.js"></script>
+  <script src="rich.js"></script>
 </body>
 </html>

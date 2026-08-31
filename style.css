@@ -135,6 +135,20 @@ code,pre,kbd,samp{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospac
 .blk-code-wrap{flex:1;min-width:0;}
 .blk-code-ta{width:100%;background:rgba(0,0,0,.45);border:1px solid #2a2a2e;border-radius:9px;padding:12px 14px;color:#e2e8f0;font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace!important;font-size:13.5px;line-height:1.6;resize:none;outline:none;overflow:hidden;}
 .blk-code-ta:focus{border-color:rgba(0,122,255,.5);}
+.blk-code-head{margin-bottom:4px;}
+.blk-code-lang{background:rgba(0,0,0,.4);border:1px solid #2a2a2e;border-radius:7px;padding:4px 9px;color:#94a3b8;font-size:11.5px;outline:none;font-family:'JetBrains Mono',monospace!important;}
+.blk-code-lang:focus{border-color:rgba(0,122,255,.5);}
+.blk-code-wrap{position:relative;}
+.blk-code-wrap pre{background:rgba(0,0,0,.5)!important;border:1px solid #2a2a2e;border-radius:9px;padding:12px 14px;overflow-x:auto;margin:0;}
+.blk-code-wrap pre code{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace!important;font-size:13.5px;line-height:1.6;background:none!important;padding:0;}
+.blk-code-badge{position:absolute;top:6px;right:10px;font-size:10px;color:#64748b;background:rgba(20,20,22,.8);padding:1px 7px;border-radius:5px;z-index:2;opacity:0;transition:opacity .12s;font-family:'JetBrains Mono',monospace!important;pointer-events:none;}
+.blk-code-wrap:hover .blk-code-badge{opacity:1;}
+.blk-code-empty{background:rgba(0,0,0,.35);border:1px dashed #2a2a2e;border-radius:9px;padding:12px 14px;color:#475569;font-size:13px;font-family:'JetBrains Mono',monospace!important;cursor:text;}
+.blk-mermaid,.mermaid-block{background:rgba(255,255,255,.02);border:1px solid #2a2a2e;border-radius:9px;padding:12px;overflow-x:auto;display:flex;justify-content:center;cursor:pointer;}
+.blk-mermaid svg,.mermaid-block svg{max-width:100%;height:auto;}
+.rich-err{color:#f87171;font-size:12px;padding:6px;}
+.katex{font-size:1.05em;}
+.katex-display{margin:.6em 0;overflow-x:auto;overflow-y:hidden;}
 .block-divider-wrap{flex:1;padding:10px 4px;cursor:pointer;border-radius:5px;}
 .block-divider-wrap.sel{background:rgba(0,122,255,.12);}
 .blk-divider{border:none;border-top:1px solid #2a2a2e;margin:0;}

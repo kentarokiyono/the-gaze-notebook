@@ -329,23 +329,8 @@
     if (b.type === 'code') {
       const wrap = document.createElement('div');
       wrap.className = 'blk-code-wrap';
-      const ta = document.createElement('textarea');
-      ta.className = 'blk-code-ta';
-      ta.value = b.text || '';
-      ta.spellcheck = false;
-      ta.placeholder = 'コード…';
-      ta.rows = Math.max(1, (b.text || '').split('\n').length);
-      const auto = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
-      ta.addEventListener('input', () => { b.text = ta.value; auto(); syncToModel(); });
-      ta.addEventListener('focus', () => { lastFocusedId = b.id; auto(); });
-      ta.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && ta.value === '' && ta.selectionStart === 0) {
-          e.preventDefault(); convertOrMerge(b);
-        }
-      });
-      wrap.appendChild(ta);
+      renderCodeView(wrap, b);
       row.appendChild(wrap);
-      requestAnimationFrame(auto);
       return row;
     }
 
@@ -414,6 +399,7 @@
     ce._map = r.map;
     ce._plain = r.plain;
     if (window.GazeAssets && ce.querySelector('img[data-asset]')) GazeAssets.hydrate(ce);
+    if (window.GazeRich && /(\$\$|\\\(|\\\[)/.test(b.text || '')) GazeRich.mathIn(ce);
   }
 
   // 現在の選択（ブラウザが配置したカーソル）から表示文字オフセットを得る
@@ -521,6 +507,51 @@
       const idx = blocks.findIndex((x) => x.id === b.id); if (idx >= 0) { blocks.splice(idx, 1); if (!blocks.length) blocks.push({ id: uid(), type: 'paragraph', text: '' }); renderAll(); syncToModel(); }
     });
     if (window.lucide) lucide.createIcons();
+  }
+
+  // ---- コードブロック（表示=ハイライト/Mermaid、クリックで編集） -----------
+  function renderCodeView(wrap, b) {
+    wrap.innerHTML = '';
+    const text = b.text || '';
+    if (b.lang === 'mermaid' && text.trim() && window.GazeRich) {
+      const badge = document.createElement('div'); badge.className = 'blk-code-badge'; badge.textContent = 'mermaid ✎';
+      const holder = document.createElement('div'); holder.className = 'blk-mermaid';
+      wrap.appendChild(badge); wrap.appendChild(holder);
+      GazeRich.renderMermaidEl(holder, text);
+      wrap.onclick = () => enterCodeEdit(wrap, b);
+      return;
+    }
+    if (!text.trim()) {
+      const ph = document.createElement('div'); ph.className = 'blk-code-empty'; ph.textContent = 'コード（クリックで編集）';
+      wrap.appendChild(ph); wrap.onclick = () => enterCodeEdit(wrap, b); return;
+    }
+    const badge = document.createElement('div'); badge.className = 'blk-code-badge'; badge.textContent = (b.lang || 'code') + ' ✎';
+    const pre = document.createElement('pre'); const code = document.createElement('code');
+    if (b.lang) code.className = 'language-' + b.lang;
+    code.textContent = text;
+    pre.appendChild(code); wrap.appendChild(badge); wrap.appendChild(pre);
+    if (window.GazeRich) GazeRich.highlightIn(wrap);
+    wrap.onclick = () => enterCodeEdit(wrap, b);
+  }
+  function enterCodeEdit(wrap, b) {
+    wrap.onclick = null; wrap.innerHTML = '';
+    const head = document.createElement('div'); head.className = 'blk-code-head';
+    const lang = document.createElement('input'); lang.className = 'blk-code-lang'; lang.value = b.lang || ''; lang.placeholder = '言語 (js, python, mermaid …)';
+    head.appendChild(lang);
+    const ta = document.createElement('textarea'); ta.className = 'blk-code-ta'; ta.value = b.text || ''; ta.spellcheck = false; ta.placeholder = 'コード…';
+    const auto = () => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
+    ta.addEventListener('input', () => { b.text = ta.value; auto(); syncToModel(); });
+    lang.addEventListener('input', () => { b.lang = lang.value.trim(); syncToModel(); });
+    ta.addEventListener('focus', () => { lastFocusedId = b.id; });
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); ta.blur(); }
+      else if (e.key === 'Backspace' && ta.value === '' && ta.selectionStart === 0) { e.preventDefault(); convertOrMerge(b); }
+      else if (e.key === 'Tab') { e.preventDefault(); const s = ta.selectionStart; ta.setRangeText('  ', s, ta.selectionEnd, 'end'); }
+    });
+    const finish = () => { b.text = ta.value; b.lang = lang.value.trim(); syncToModel(); renderCodeView(wrap, b); };
+    wrap.addEventListener('focusout', (e) => { if (!wrap.contains(e.relatedTarget)) finish(); });
+    wrap.appendChild(head); wrap.appendChild(ta);
+    auto(); ta.focus();
   }
 
   // ---- editable events ------------------------------------------------------
@@ -716,7 +747,7 @@
       blocks.splice(idx + 1, 0, nb);
       renderAll(); focusBlock(nb.id, 0);
     } else if (b.type === 'code') {
-      renderAll(); const r = rowOf(b.id); const ta = r && r.querySelector('.blk-code-ta'); if (ta) ta.focus();
+      renderAll(); const r = rowOf(b.id); const wrap = r && r.querySelector('.blk-code-wrap'); if (wrap) enterCodeEdit(wrap, b);
     } else {
       renderAll(); focusBlock(b.id, 0);
     }
@@ -867,7 +898,7 @@
       blocks.splice(idx + 1, 0, nb);
       renderAll(); focusBlock(nb.id, 0); syncToModel(); return;
     }
-    if (type === 'code') { b.type = 'code'; b.lang = b.lang || ''; renderAll(); const r = rowOf(b.id); const ta = r && r.querySelector('.blk-code-ta'); if (ta) ta.focus(); syncToModel(); return; }
+    if (type === 'code') { b.type = 'code'; b.lang = b.lang || ''; renderAll(); const r = rowOf(b.id); const wrap = r && r.querySelector('.blk-code-wrap'); if (wrap) enterCodeEdit(wrap, b); syncToModel(); return; }
     if (type === 'image') { pickImage((file) => insertImageFile(file, b.id)); return; }
     if (type === 'inlinedb') {
       b.type = 'inlinedb'; b.text = '';
@@ -1083,6 +1114,7 @@
       if (bodyEl) {
         try { bodyEl.innerHTML = window.marked ? marked.parse(content) : esc(content); }
         catch (e) { bodyEl.textContent = content; }
+        if (window.GazeRich) GazeRich.enhance(bodyEl);
         bodyEl.querySelectorAll('a').forEach((a) => { a.addEventListener('click', (ev) => ev.preventDefault()); });
       }
     });
