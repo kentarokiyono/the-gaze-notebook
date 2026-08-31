@@ -235,6 +235,24 @@ code,pre,kbd,samp{font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospac
 .inline-db .db-viewbar{padding-top:6px;}
 .inline-db .db-body{padding:12px;}
 .inline-db-err{padding:16px;color:#94a3b8;font-size:13px;}
+/* ===== Chart block (Phase 15) ===== */
+.blk-chart{flex:1;min-width:0;border:1px solid #2a2a2e;border-radius:11px;overflow:hidden;background:rgba(255,255,255,.01);}
+.blk-chart-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #2a2a2e;background:rgba(255,255,255,.02);}
+.blk-chart-t{flex:1;min-width:0;font-size:13px;font-weight:600;color:#e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.blk-chart-edit{display:flex;align-items:center;gap:5px;font-size:11px;color:#94a3b8;padding:5px 9px;border-radius:7px;}
+.blk-chart-edit:hover{color:#e2e8f0;background:rgba(255,255,255,.06);}
+.blk-chart-canvaswrap{position:relative;height:300px;padding:12px;}
+.blk-chart-canvaswrap canvas{max-height:100%;}
+.chart-err{color:#f87171;font-size:12px;padding:16px;text-align:center;}
+.blk-chart-editor{padding:12px;display:flex;flex-direction:column;gap:8px;}
+.blk-chart-row{display:flex;gap:8px;align-items:center;}
+.blk-chart-type,.blk-chart-title{background:#0a0a0b;border:1px solid #2a2a2e;border-radius:7px;padding:7px 9px;color:#e2e8f0;font-size:13px;outline:none;}
+.blk-chart-title{flex:1;}
+.blk-chart-type:focus,.blk-chart-title:focus,.blk-chart-csv:focus{border-color:rgba(0,122,255,.5);}
+.blk-chart-done{font-size:12px;color:#fff;background:#007aff;padding:7px 14px;border-radius:7px;flex-shrink:0;}
+.blk-chart-done:hover{background:#0056b3;}
+.blk-chart-csv{background:#0a0a0b;border:1px solid #2a2a2e;border-radius:8px;padding:10px 12px;color:#e2e8f0;font-size:13px;line-height:1.6;min-height:120px;resize:vertical;outline:none;font-family:'JetBrains Mono','SF Mono',Menlo,monospace!important;}
+.blk-chart-hint{font-size:11px;color:#64748b;}
 /* ===== Canvas (Phase 8) ===== */
 #canvas-view{overflow:hidden;background:#0d0d0f;background-image:radial-gradient(#1c1c22 1px,transparent 1px);background-size:24px 24px;outline:none;cursor:grab;}
 #canvas-view.panning{cursor:grabbing;}

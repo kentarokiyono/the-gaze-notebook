@@ -27,6 +27,7 @@
     { type: 'code', label: 'コード', sub: 'コードブロック', icon: 'code', kw: 'code こーど' },
     { type: 'image', label: '画像', sub: '画像を挿入', icon: 'image', kw: 'image img 画像 がぞう' },
     { type: 'inlinedb', label: 'インラインDB', sub: 'ページ内データベース', icon: 'table', kw: 'database db table インライン でーたべーす' },
+    { type: 'chart', label: 'チャート', sub: 'データからグラフ生成', icon: 'bar-chart-3', kw: 'chart graph グラフ ちゃーと 棒 折れ線 円' },
     { type: 'bookmark', label: 'ブックマーク', sub: 'URLをカード表示', icon: 'bookmark', kw: 'bookmark link url ぶっくまーく りんく' },
     { type: 'webembed', label: 'Web埋め込み', sub: 'ページをiframe表示', icon: 'globe', kw: 'web embed iframe browser ぶらうざ うぇぶ' },
     { type: 'divider', label: '区切り線', sub: '水平線', icon: 'minus', kw: 'divider hr line くぎり せん' },
@@ -167,6 +168,9 @@
         if (lang === 'gaze-db') {
           let dbData = null; try { dbData = JSON.parse(code.join('\n')); } catch (e) {}
           out.push({ id: uid(), type: 'inlinedb', text: '', dbData: dbData || (window.GazeDB && GazeDB.newInlineDb ? GazeDB.newInlineDb() : { props: [], rows: [], views: [], activeView: null }) });
+        } else if (lang === 'gaze-chart') {
+          let spec = null; try { spec = JSON.parse(code.join('\n')); } catch (e) {}
+          out.push({ id: uid(), type: 'chart', text: '', chartData: spec || (window.GazeChart ? GazeChart.defaultSpec() : { type: 'bar', title: '', csv: '' }) });
         } else {
           out.push({ id: uid(), type: 'code', text: code.join('\n'), lang });
         }
@@ -199,6 +203,7 @@
       case 'callout': return '> [!' + (b.variant || 'note') + '] ' + b.text;
       case 'code': return '```' + (b.lang || '') + '\n' + (b.text || '') + '\n```';
       case 'inlinedb': return '```gaze-db\n' + JSON.stringify(b.dbData || {}) + '\n```';
+      case 'chart': return '```gaze-chart\n' + JSON.stringify(b.chartData || {}) + '\n```';
       case 'web': return '@web(' + (b.mode || 'card') + '){' + (b.url || '') + '}';
       case 'embed': return '![[' + b.text + ']]';
       case 'divider': return '---';
@@ -315,6 +320,13 @@
     }
 
     if (b.type === 'web') { createWebRow(row, b); return row; }
+
+    if (b.type === 'chart') {
+      const box = document.createElement('div'); box.className = 'blk-chart';
+      row.appendChild(box);
+      renderChartView(box, b);
+      return row;
+    }
 
     if (b.type === 'divider') {
       const d = document.createElement('div');
@@ -552,6 +564,41 @@
     wrap.addEventListener('focusout', (e) => { if (!wrap.contains(e.relatedTarget)) finish(); });
     wrap.appendChild(head); wrap.appendChild(ta);
     auto(); ta.focus();
+  }
+
+  // ---- チャートブロック -----------------------------------------------------
+  function renderChartView(box, b) {
+    box.innerHTML = '';
+    const spec = b.chartData || {};
+    const bar = document.createElement('div'); bar.className = 'blk-chart-bar';
+    bar.innerHTML = '<span class="blk-chart-t">' + esc(spec.title || 'チャート') + '</span><button class="blk-chart-edit"><i data-lucide="pencil" class="w-3.5 h-3.5"></i>編集</button>';
+    const holder = document.createElement('div'); holder.className = 'blk-chart-canvaswrap';
+    const canvas = document.createElement('canvas');
+    holder.appendChild(canvas);
+    box.appendChild(bar); box.appendChild(holder);
+    if (window.lucide) lucide.createIcons();
+    bar.querySelector('.blk-chart-edit').addEventListener('click', () => enterChartEdit(box, b));
+    if (window.GazeChart) requestAnimationFrame(() => GazeChart.render(canvas, spec));
+  }
+  function enterChartEdit(box, b) {
+    const spec = b.chartData || (window.GazeChart ? GazeChart.defaultSpec() : { type: 'bar', title: '', csv: '' });
+    box.innerHTML = '';
+    const ed = document.createElement('div'); ed.className = 'blk-chart-editor';
+    const types = [['bar', '棒'], ['line', '折れ線'], ['pie', '円'], ['doughnut', 'ドーナツ'], ['radar', 'レーダー']];
+    ed.innerHTML =
+      '<div class="blk-chart-row"><select class="blk-chart-type">' + types.map((t) => '<option value="' + t[0] + '"' + (spec.type === t[0] ? ' selected' : '') + '>' + t[1] + '</option>').join('') + '</select>' +
+      '<input class="blk-chart-title" placeholder="タイトル" value="' + esc(spec.title || '') + '">' +
+      '<button class="blk-chart-done">完了</button></div>' +
+      '<textarea class="blk-chart-csv" spellcheck="false" placeholder="1行目=見出し。例:\n月,売上,利益\n1月,120,30\n2月,150,45">' + esc(spec.csv || '') + '</textarea>' +
+      '<div class="blk-chart-hint">1行目がヘッダー（1列目=ラベル、2列目以降=系列）。カンマ区切り。</div>';
+    box.appendChild(ed);
+    const typeSel = ed.querySelector('.blk-chart-type'), titleI = ed.querySelector('.blk-chart-title'), csvT = ed.querySelector('.blk-chart-csv');
+    const apply = () => { b.chartData = { type: typeSel.value, title: titleI.value, csv: csvT.value }; syncToModel(); };
+    typeSel.addEventListener('change', apply);
+    titleI.addEventListener('input', apply);
+    csvT.addEventListener('input', apply);
+    ed.querySelector('.blk-chart-done').addEventListener('click', () => { apply(); renderChartView(box, b); });
+    csvT.focus();
   }
 
   // ---- editable events ------------------------------------------------------
@@ -907,6 +954,16 @@
       const after = { id: uid(), type: 'paragraph', text: '' };
       blocks.splice(idx + 1, 0, after);
       renderAll(); syncToModel(); return;
+    }
+    if (type === 'chart') {
+      b.type = 'chart'; b.text = '';
+      b.chartData = (window.GazeChart ? GazeChart.defaultSpec() : { type: 'bar', title: '', csv: '' });
+      const idx = blocks.findIndex((x) => x.id === b.id);
+      const after = { id: uid(), type: 'paragraph', text: '' };
+      blocks.splice(idx + 1, 0, after);
+      renderAll(); syncToModel();
+      const r = rowOf(b.id); const wrap = r && r.querySelector('.blk-chart'); if (wrap) enterChartEdit(wrap, b);
+      return;
     }
     if (type === 'bookmark' || type === 'webembed') {
       b.type = 'web'; b.mode = type === 'webembed' ? 'frame' : 'card'; b.url = b.url || ''; b.text = '';
